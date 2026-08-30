@@ -31,15 +31,25 @@ def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
     return yearlySchedule
     # Names will need to be pushed to frontend for selection.
 
+def get_race(year: int, event_name: str, type: str = "R"):
+    """Will get a race from fastf1's API AND load it into the database
+
+    Args:
+        year (int): The year the event took place
+        event_name (str): The name of the event
+        type (str, optional): What type of race to grab. Types: 'FP1', 'FP2', 'FP3', 'Q', 'R'. Defaults to "R".
+    """
+    db.load_session_into_db(fastf1.get_session(year, event_name, type))
+
 
 # Helper/Debug Functions
-def _get_event_names(schedule: EventSchedule):
+def _get_event_names(schedule: EventSchedule) -> pd.Series[typing.Any] | None:
     """Helper function for getting a list of names. Scaffolded to help with frontend
 
     Args:
         schedule (EventSchedule): The yearly event schedule
 
-    # TODO: Type hint the return properly
+    # TODO: Type hint the return properly (Helper so not priority)
     Returns:
         _type_: _description_
     """
@@ -47,9 +57,9 @@ def _get_event_names(schedule: EventSchedule):
 
 
 def _main():
-    sched = get_schedule_by_year(2026)
-    names = _get_event_names(sched)
-    print(names)
+    db.create_schema()
+    get_race(2026, "Japanese Grand Prix", "R")
+    db._preview_db()
     return 0
 
 
