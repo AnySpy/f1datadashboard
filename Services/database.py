@@ -127,7 +127,7 @@ def load_session_into_db(year, event, session_type, db_path=DB_PATH):
 
 
 # %% [4] QUICK CHECK — READ DATA BACK OUT ------------------------------------
-def preview_db(db_path=DB_PATH):
+def _preview_db(db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     print("\n--- Sessions ---")
     print(pd.read_sql("SELECT * FROM sessions", conn))
@@ -142,4 +142,4 @@ def preview_db(db_path=DB_PATH):
 if __name__ == "__main__":
     create_schema()
     load_session_into_db(2023, "Bahrain", "R")
-    preview_db()
+    _preview_db()
