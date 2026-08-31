@@ -20,7 +20,10 @@ DB_PATH = "f1_data.db"
 
 
 # %% [2] CREATE THE DATABASE SCHEMA ------------------------------------------
-def create_schema(db_path=DB_PATH):
+# ! This MUST be run at startup. We need somewhere to call this that only runs on init of the app.
+def create_schema(db_path: str = DB_PATH) -> None:
+    """ Defines the database
+    """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
@@ -73,16 +76,19 @@ def create_schema(db_path=DB_PATH):
 
 
 # %% [3] LOAD DATA FROM FASTF1 API INTO THE DB -------------------------------
-def load_session_into_db(year, event, session_type, db_path=DB_PATH):
+def load_session_into_db(session, db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    session = fastf1.get_session(year, event, session_type)
     session.load()
 
     laps = session.laps.copy()
     weather = session.weather_data.copy()
     total_laps = int(laps["LapNumber"].max())
+    year = session.date.year
+    event = session.event.EventName
+    # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
+    session_type = session.event.Session5
 
     # Insert into sessions table (or get existing session_id if already loaded)
     cur.execute("""
@@ -127,7 +133,7 @@ def load_session_into_db(year, event, session_type, db_path=DB_PATH):
 
 
 # %% [4] QUICK CHECK — READ DATA BACK OUT ------------------------------------
-def preview_db(db_path=DB_PATH):
+def _preview_db(db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     print("\n--- Sessions ---")
     print(pd.read_sql("SELECT * FROM sessions", conn))
@@ -141,5 +147,6 @@ def preview_db(db_path=DB_PATH):
 # %% [5] RUN IT ---------------------------------------------------------------
 if __name__ == "__main__":
     create_schema()
-    load_session_into_db(2023, "Bahrain", "R")
-    preview_db()
+    session = fastf1.get_session(2023, "Bahrain", "R")
+    load_session_into_db(session)
+    _preview_db()
