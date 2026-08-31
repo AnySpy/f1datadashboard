@@ -14,10 +14,10 @@ Global Vars
 """
 currentPageIndex = 0
 
-"""
+'''
 @brief This is is the class describing UI components of the main window
         launched on startup
-"""
+'''
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
