@@ -1,0 +1,9 @@
+#virtual env
+f1datavenv/
+
+#vs code settings
+.vscode
+
+#pycache
+UI/__pycache__/
+
