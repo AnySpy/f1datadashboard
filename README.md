@@ -3,10 +3,10 @@ Project utilizing the fast f1 api to make f1 data telemetry easier to read and d
 
 ## Installs Needed for Project
 The installs you will need are within the requirements.txt file to download the files use command
-<code>pip install < requirements.txt<code> 
 
+`pip3 install -r requirements.txt`
 or 
-
-<code>pip3 install < requirements.txt<code> 
+`pip install -r requirements.txt`
 
 depending on your pip setup
+
