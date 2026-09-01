@@ -17,7 +17,7 @@ def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
     Returns:
         EventSchedule: The full event schedule of the year
     """
-    yearlySchedule = fastf1.get_event_schedule(year, include_testing=False)
+    yearlySchedule = fastf1.get_event_schedule(year, include_testing=testing)
     return yearlySchedule
     # Names will need to be pushed to frontend for selection.
 
