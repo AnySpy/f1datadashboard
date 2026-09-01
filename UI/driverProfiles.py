@@ -1,11 +1,11 @@
-from PySide6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QPushButton
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout
 
 """
 @brief page for the driver profiles
 """
-class DriverProfiles(QWidget):
 
+
+class DriverProfiles(QWidget):
     def __init__(self):
         super().__init__()
 

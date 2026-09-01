@@ -1,8 +1,10 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 
 """
 @brief page for data analysis
 """
+
+
 class DataAnalysisPage(QWidget):
     def __init__(self):
         super().__init__()
