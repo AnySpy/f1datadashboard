@@ -12,7 +12,7 @@ def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
 
     Args:
         year (int): Year to grab the event schedule for
-        testing (bool): Whether to include testing
+        testing (bool): Whether to include testing races. Defaults to False.
 
     Returns:
         EventSchedule: The full event schedule of the year
@@ -34,7 +34,8 @@ def get_race(year: int, event_name: str, type: str = "R") -> None:
 
 
 # Helper/Debug Functions
-# TODO: Type hint the return properly (Helper so not priority)
+# ? If we can type hint the return to something other than "pd.Series[typing.Any] | None" I would love it forever.
+# ?     Not a priority since it's just a cosmetic change, but I'd like to figure out a different type hint that doesn't make PyLance cry.
 def _get_event_names(schedule: EventSchedule) -> pd.Series[typing.Any] | None:
     """Helper function for getting a list of names. Scaffolded to help with frontend
 

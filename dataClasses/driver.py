@@ -6,9 +6,9 @@ class Driver:
     # ? Initial variables are intentionally dummy variables
     def __init__(
         self,
-        name: str = "ABCXYZ",
-        vehicle: Vehicle = Vehicle(),
-        current_placement: int = -1,
+        _name: str = "ABCXYZ",
+        _vehicle: Vehicle = Vehicle(),
+        _placement: int = -1,
     ):
         """Constructor for the driver class
 
@@ -17,9 +17,9 @@ class Driver:
             vehicle (Vehicle, optional): The vehicle object the driver is operating. Defaults to Vehicle().
             current_placement (int, optional): The current placement of the driver. Defaults to -1.
         """
-        self.name = name
-        self.vehicle = vehicle
-        self.current_placement = current_placement
+        self._name = _name
+        self._vehicle = _vehicle
+        self._placement = _placement
 
     def get_name(self) -> str:
         """Getter for the name of the driver.
@@ -27,7 +27,7 @@ class Driver:
         Returns:
             str: The name of the driver.
         """
-        return self.name
+        return self._name
 
     def set_name(self, name: str) -> None:
         """Setter for the name of the driver.
@@ -35,7 +35,7 @@ class Driver:
         Args:
             name (str): The name of the driver.
         """
-        self.name = name
+        self._name = name
 
     def get_vehicle(self) -> Vehicle:
         """Getter for the vehicle of the driver.
@@ -43,7 +43,7 @@ class Driver:
         Returns:
             Vehicle: The vehicle object the driver is operating.
         """
-        return self.vehicle
+        return self._vehicle
 
     def set_vehicle(self, vehicle: Vehicle) -> None:
         """Setter for the vehicle of the driver.
@@ -51,7 +51,7 @@ class Driver:
         Args:
             vehicle (Vehicle): The vehicle object the driver is operating.
         """
-        self.vehicle = vehicle
+        self._vehicle = vehicle
 
     def get_current_placement(self) -> int:
         """Getter for the current placement of the driver.
@@ -59,7 +59,7 @@ class Driver:
         Returns:
             int: The current placement of the driver.
         """
-        return self.current_placement
+        return self._placement
 
     def set_current_placement(self, current_placement: int) -> None:
         """Setter for the current placement of the driver.
@@ -67,7 +67,7 @@ class Driver:
         Args:
             current_placement (int): The current placement of the driver.
         """
-        self.current_placement = current_placement
+        self._placement = current_placement
 
     name = property(get_name, set_name)
     vehicle = property(get_vehicle, set_vehicle)
@@ -75,6 +75,9 @@ class Driver:
 
 
 def _main():
+    verstop = Driver()
+    verstop.name = "VER"
+    print(verstop.name)
     return 0
 
 

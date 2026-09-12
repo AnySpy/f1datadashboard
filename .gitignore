@@ -1,10 +1,17 @@
 #virtual env
 f1datavenv/
 f1venv
+.venv
 
 #vs code settings
 .vscode
 
+# Ruff cache
+.ruff_cache
+
 #pycache
 UI/__pycache__/
+dataClasses/__pycache__/
 
+#fastf1 cache
+f1_cache/*
