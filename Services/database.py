@@ -8,7 +8,7 @@
 # ==========================================================================
 
 # ! Problems:
-# !     Calls to the database needs to have a unique key to make sure the event is available.
+# !     Calls to the database needs to have a unique key to make sure the event is available during a quick lookup.
 # !             We could pass the entire EventSchedule to a frontend helper function to not mangle the data while still presenting the EventName to the user?
 # !     We need a way to mark whether an event is a future event and we need to update those events with final standings when they hit the API.
 
@@ -88,7 +88,7 @@ def create_schema(db_path: str = DB_PATH) -> None:
 
 # %% [3] LOAD DATA FROM FASTF1 API INTO THE DB -------------------------------
 def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
-    """Provided a session, will insert the data into the database
+    """Provided a session, will insert the session data into the database
 
     Args:
         session (Session): A session object from the fastf1 API.
