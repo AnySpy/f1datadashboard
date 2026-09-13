@@ -2,11 +2,11 @@ from typing import Any
 
 
 class Vehicle:
-    # ? Initial variables are intentionally dummy variables
+    # ? Initial variables are intentionally dummy variables. Please update as needed.
     def __init__(
         self,
         coordinates: list[float] = [0.00, 0.00, 0.00],
-        fuel_level: float = -100.00,
+        fuel_level: float = 110.00,
         throttle: float = -1.00,
         brake: float = -1.00,
         gear: int = -1
@@ -14,12 +14,12 @@ class Vehicle:
         """Constructor for the vehicle class
 
         Args:
-            _coordinates (list[float], optional): A list containing coordinates in the format of [x, y, z]. Defaults to [0.00, 0.00, 0.00].
-            _fuel_level (float, optional): A float representing the percentage of fuel left. Defaults to -100.00.
-            _throttle (float, optional): A float representing the percentage of throttle applied. Defaults to -1.00.
-            _brake (float, optional): A float representing the percentage of brake applied. Defaults to -1.00.
-            _rpm (float, optional): A float representing the percentage of RPM used. Defaults to -1.00
-            _gear (int, optional): The current gear of the vehicle. Defaults to -1.
+            coordinates (list[float], optional): A list containing coordinates in the format of [x, y, z]. Defaults to [0.00, 0.00, 0.00].
+            fuel_level (float, optional): A float representing the amount of fuel left in kgs. Defaults to 110.00.
+            throttle (float, optional): A float representing the percentage of throttle applied. Defaults to -1.00.
+            brake (float, optional): A float representing the percentage of brake applied. Defaults to -1.00.
+            rpm (float, optional): A float representing the percentage of RPM used. Defaults to -1.00
+            gear (int, optional): The current gear of the vehicle. Defaults to -1.
         """
         # ? Should coordinates be passed in a list/tuple, or do we want each coord passed individually?
         self._x = coordinates[0]
