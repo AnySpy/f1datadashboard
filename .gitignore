@@ -12,6 +12,7 @@ f1venv
 #pycache
 UI/__pycache__/
 dataClasses/__pycache__/
+services/__pycache__/
 
 #fastf1 cache
 f1_cache/*

@@ -5,29 +5,30 @@ class Vehicle:
     # ? Initial variables are intentionally dummy variables
     def __init__(
         self,
-        _coordinates: list[float] = [0.00, 0.00, 0.00],
-        _fuel_level: float = -100.00,
-        _throttle: float = -1.00,
-        _brake: float = -1.00,
-        _gear: int = -1,
+        coordinates: list[float] = [0.00, 0.00, 0.00],
+        fuel_level: float = -100.00,
+        throttle: float = -1.00,
+        brake: float = -1.00,
+        gear: int = -1
     ):
         """Constructor for the vehicle class
 
         Args:
-            coordinates (list[float], optional): A list containing coordinates in the format of [x, y, z]. Defaults to [0.00, 0.00, 0.00].
-            fuel_level (float, optional): A float representing the percentage of fuel left. Defaults to -100.00.
-            throttle (float, optional): A float representing the percentage of throttle applied. Defaults to -1.00.
-            brake (float, optional): A float representing the percentage of brake applied. Defaults to -1.00.
-            gear (int, optional): The current gear of the vehicle. Defaults to -1.
+            _coordinates (list[float], optional): A list containing coordinates in the format of [x, y, z]. Defaults to [0.00, 0.00, 0.00].
+            _fuel_level (float, optional): A float representing the percentage of fuel left. Defaults to -100.00.
+            _throttle (float, optional): A float representing the percentage of throttle applied. Defaults to -1.00.
+            _brake (float, optional): A float representing the percentage of brake applied. Defaults to -1.00.
+            _rpm (float, optional): A float representing the percentage of RPM used. Defaults to -1.00
+            _gear (int, optional): The current gear of the vehicle. Defaults to -1.
         """
         # ? Should coordinates be passed in a list/tuple, or do we want each coord passed individually?
-        self._x = _coordinates[0]
-        self._y = _coordinates[1]
-        self._z = _coordinates[2]
-        self._fuel_level = _fuel_level
-        self._throttle = _throttle
-        self._brake = _brake
-        self._gear = _gear
+        self._x = coordinates[0]
+        self._y = coordinates[1]
+        self._z = coordinates[2]
+        self._fuel_level = fuel_level
+        self._throttle = throttle
+        self._brake = brake
+        self._gear = gear
 
     def get_coords(self) -> list[float]:
         """Getter for the coordinates
