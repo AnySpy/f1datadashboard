@@ -6,9 +6,9 @@ class Driver:
     # ? Initial variables are intentionally dummy variables
     def __init__(
         self,
-        _name: str = "ABCXYZ",
-        _vehicle: Vehicle = Vehicle(),
-        _placement: int = -1,
+        name: str = "ABCXYZ",
+        vehicle: Vehicle = Vehicle(),
+        placement: int = -1,
     ):
         """Constructor for the driver class
 
@@ -17,9 +17,9 @@ class Driver:
             vehicle (Vehicle, optional): The vehicle object the driver is operating. Defaults to Vehicle().
             current_placement (int, optional): The current placement of the driver. Defaults to -1.
         """
-        self._name = _name
-        self._vehicle = _vehicle
-        self._placement = _placement
+        self._name = name
+        self._vehicle = vehicle
+        self._placement = placement
 
     def get_name(self) -> str:
         """Getter for the name of the driver.
