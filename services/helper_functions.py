@@ -22,7 +22,7 @@ def get_fuel_change(car: Vehicle) -> float:
     return fuel_used
 
 def _main():
-    cat = Vehicle(fuel_level=100.00, throttle=0.75)
+    cat = Vehicle(fuel_level=100.00, throttle=0.52)
     fuel_change = get_fuel_change(cat)
     print(cat.fuel_level - fuel_change)
     return 0
