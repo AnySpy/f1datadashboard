@@ -67,6 +67,25 @@ def create_schema(db_path: str = DB_PATH) -> None:
     )
     """)
 
+    # Drivers table — one row per driver, per session (a driver's team/
+    # number can change across a season, so we key on (session_id,
+    # driver_code) rather than one global driver_code).
+    # driver_code = FastF1's 3-letter code (e.g. "VER") — this is the
+    # SAME value already stored in laps.driver, so it works as a join
+    # key without changing the laps table.
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS drivers (
+        session_id INTEGER NOT NULL,
+        driver_code TEXT NOT NULL,
+        full_name TEXT,
+        team TEXT,
+        number INTEGER,
+        color TEXT,
+        PRIMARY KEY (session_id, driver_code),
+        FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+    """)
+
     # Weather table — one row per weather sample, linked to a session
     cur.execute("""
     CREATE TABLE IF NOT EXISTS weather (
@@ -101,6 +120,7 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
 
     laps = session.laps.copy()
     weather = session.weather_data.copy()
+    results = session.results.copy()  # has driver code, name, team, number, color
     total_laps = int(laps["LapNumber"].max())
     year = session.date.year
     event = session.event.EventName
@@ -125,6 +145,24 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
         (year, event, session_type),
     )
     session_id = cur.fetchone()[0]
+
+    # Insert drivers
+    for _, row in results.iterrows():
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO drivers (session_id, driver_code, full_name, team, number, color)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """,
+            (
+                session_id,
+                row.get("Abbreviation"),
+                row.get("FullName"),
+                row.get("TeamName"),
+                row.get("DriverNumber"),
+                row.get("TeamColor"),
+            ),
+        )
+    conn.commit()
 
     # Insert laps
     for _, row in laps.iterrows():
@@ -173,7 +211,8 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     conn.commit()
     conn.close()
     print(
-        f"Loaded {len(laps)} laps and {len(weather)} weather samples for {year} {event} {session_type}"
+        f"Loaded {len(results)} drivers, {len(laps)} laps, and {len(weather)} "
+        f"weather samples for {year} {event} {session_type}"
     )
 
 
@@ -187,6 +226,8 @@ def _preview_db(db_path: str = DB_PATH):
     conn = sqlite3.connect(db_path)
     print("\n--- Sessions ---")
     print(pd.read_sql("SELECT * FROM sessions", conn))
+    print("\n--- Drivers ---")
+    print(pd.read_sql("SELECT * FROM drivers", conn))
     print("\n--- Sample laps ---")
     print(pd.read_sql("SELECT * FROM laps LIMIT 5", conn))
     print("\n--- Sample weather ---")
@@ -204,4 +245,3 @@ def _main():
 # %% [5] RUN IT ---------------------------------------------------------------
 if __name__ == "__main__":
     _main()
-    
