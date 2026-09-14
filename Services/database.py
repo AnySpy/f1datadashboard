@@ -28,7 +28,7 @@ DB_PATH = "f1_data.db"
 
 
 # %% [2] CREATE THE DATABASE SCHEMA ------------------------------------------
-# ! This MUST be run at startup. We need somewhere to call this that only runs on init of the app.
+# ! This MUST be run at startup. We need somewhere to call this that only runs on init of the app/loss of viable database.
 def create_schema(db_path: str = DB_PATH) -> None:
     """Defines the database
 
