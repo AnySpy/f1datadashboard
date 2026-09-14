@@ -143,11 +143,15 @@ def _preview_db(db_path=DB_PATH):
     print(pd.read_sql("SELECT * FROM weather LIMIT 5", conn))
     conn.close()
 
-
-# %% [5] RUN IT ---------------------------------------------------------------
-if __name__ == "__main__":
+def _main():
     create_schema()
     session = fastf1.get_session(2023, "Bahrain", "R")
     load_session_into_db(session)
     _preview_db()
+    return 0
+
+
+# %% [5] RUN IT ---------------------------------------------------------------
+if __name__ == "__main__":
+    _main()
     
