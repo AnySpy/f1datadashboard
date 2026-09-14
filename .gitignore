@@ -16,4 +16,7 @@ services/__pycache__/
 graphs/__pycache__/
 
 #fastf1 cache
-f1_cache/*
+f1_cache/
+
+#database
+*.db
