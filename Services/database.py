@@ -150,3 +150,4 @@ if __name__ == "__main__":
     session = fastf1.get_session(2023, "Bahrain", "R")
     load_session_into_db(session)
     _preview_db()
+    
