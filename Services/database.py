@@ -100,6 +100,27 @@ def create_schema(db_path: str = DB_PATH) -> None:
     )
     """)
 
+    """
+    ____________________________________________________________________________
+    |                            track status table                            |
+    ____________________________________________________________________________
+    |entryID| session ID |time | track safety status code | track surface temp | 
+    ____________________________________________________________________________
+    |   0   |    1       | 0.00|              0           |        97.2        | example data
+    ____________________________________________________________________________
+
+    """
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS trackStatus (
+        entryID INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL, 
+        time TEXT,
+        trackTemp REAL,
+        trackSafetyStatus INTEGER, 
+        trackSurfaceTemp REAL, 
+        FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+    """)
     conn.commit()
     conn.close()
     print(f"Schema created at {db_path}")
