@@ -24,7 +24,7 @@ class DriverProfilesViewModel(QObject):
         return 0
 
     #dataType historical, seasonData, teamData
-    def fetchDriverData(self, dataType):
+    def fetchDriverData(self, session: str):
         #stub
         return 0
 
