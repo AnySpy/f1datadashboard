@@ -1,13 +1,3 @@
-# ----------------------------------------
-# This file is meant to handle all API calls, which will then be passed to the database as needed.
-# By: Gwyn Young
-# ----------------------------------------
-
-# ! Problems:
-# !     Calls to the database needs to have a unique key to make sure the event is available.
-# !             We could pass the entire EventSchedule to a frontend helper function to not mangle the data while still presenting the EventName to the user?
-# !     We need a way to mark whether an event is a future event and we need to update those events with final standings when they hit the API.
-
 # Imports
 import fastf1
 import database as db
@@ -17,21 +7,22 @@ import typing
 
 
 def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
-    """When passed a year as an int, will return the name of the events. 
+    """When passed a year as an int, will return the name of the events.
     Should be called to gain a list of events in a year
 
     Args:
         year (int): Year to grab the event schedule for
-        testing (bool): Whether to include testing
+        testing (bool): Whether to include testing races. Defaults to False.
 
     Returns:
         EventSchedule: The full event schedule of the year
     """
-    yearlySchedule = fastf1.get_event_schedule(year, include_testing=False)
+    yearlySchedule = fastf1.get_event_schedule(year, include_testing=testing)
     return yearlySchedule
     # Names will need to be pushed to frontend for selection.
 
-def get_race(year: int, event_name: str, type: str = "R"):
+
+def get_race(year: int, event_name: str, type: str = "R") -> None:
     """Will get a race from fastf1's API AND load it into the database
 
     Args:
@@ -43,13 +34,14 @@ def get_race(year: int, event_name: str, type: str = "R"):
 
 
 # Helper/Debug Functions
+# ? If we can type hint the return to something other than "pd.Series[typing.Any] | None" I would love it forever.
+# ?     Not a priority since it's just a cosmetic change, but I'd like to figure out a different type hint that doesn't make PyLance cry.
 def _get_event_names(schedule: EventSchedule) -> pd.Series[typing.Any] | None:
     """Helper function for getting a list of names. Scaffolded to help with frontend
 
     Args:
         schedule (EventSchedule): The yearly event schedule
 
-    # TODO: Type hint the return properly (Helper so not priority)
     Returns:
         _type_: _description_
     """
@@ -64,5 +56,5 @@ def _main():
 
 
 # Obligatory
-if __name__ == '__main__':
+if __name__ == "__main__":
     _main()
