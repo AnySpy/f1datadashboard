@@ -18,13 +18,13 @@ class TrackStatusVM(QObject):
         self.updatedTrackSafety.emit(self.currentTrackSafety)
 
 
-    def setSurfaceStatus(self, newStatus):
+    def setSurfaceStatus(self, newStatus: str):
         #this could affect 2 views in the Front end so may add a Signal
         if(newStatus != self.currentTrackSurface):
             self.currentTrackSurface = newStatus
             self.updatedTrackSurface.emit(newStatus)
 
-    def setSafetyStatus(self, newStatus):
+    def setSafetyStatus(self, newStatus: str):
         # might need to run a check that newstatus is an accepted status
         if (newStatus != self.currentTrackSafety):
             self.currentTrackSafety = newStatus
@@ -82,7 +82,7 @@ class DriverStandingsVM(QObject):
 
     # set the focussed Driver
     #when user selects a user from the driver standings, show specific telemetry for that driver
-    def toggleFocusDriver(self, newDriver):
+    def toggleFocusDriver(self, newDriver: object):
         if(newDriver == self.currentFocusDriver):
             self.updateFocusDriver.emit(None)
             self.currentFocusDriver = None
@@ -95,7 +95,7 @@ class DriverStandingsVM(QObject):
         return self.focusDriver
 
     # grab driver telemetry from db
-    def fetchDriverTelemetry(self, focusDriver):
+    def fetchDriverTelemetry(self, focusDriver: object):
         focussedData = {"currentLap": 0, "currentGear": 0, "tireLife": 0, "currentSpeed": 0, "currentRPM": 0, "currentFuel": 0.0}
         # current lap, current gear, current tire life, current speed, current RPM, current fuel
         # focussedData = db.getDriverData(focusDriver)
