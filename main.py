@@ -6,6 +6,7 @@ from PySide6.QtGui import *
 from UI.home import HomePage
 from UI.dataAnalysisPage import DataAnalysisPage
 from UI.driverProfiles import DriverProfiles
+from ViewModels import raceSimulationVM
 
 
 """
@@ -26,6 +27,11 @@ class MainWindow(QMainWindow):
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
+        #
+        # initialize all view models
+        #
+        # create initialize track status view model
+        self.monitorTrackStatus = raceSimulationVM.TrackStatusVM()
 
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
@@ -75,6 +81,8 @@ class Sidebar(QWidget):
         # self.setMinimumWidth(40)
         self.setAutoFillBackground(True)
         self.setBackgroundRole(QPalette.Base)
+
+        
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignTop)
         changePageBtn = QPushButton("Home")
@@ -100,10 +108,13 @@ class Sidebar(QWidget):
     def updateHightlight(self):
         print("update button highlight")
 
-
-if __name__ == "__main__":
+def _main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.resize(700, 300)
     window.show()
     sys.exit(app.exec())
+       
+
+if __name__ == "__main__":
+    _main()

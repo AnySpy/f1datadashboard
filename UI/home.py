@@ -52,3 +52,4 @@ class DriverTelemetry(QWidget):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.addWidget(QLabel("Driver Telemetry"))
+
