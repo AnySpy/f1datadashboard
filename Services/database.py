@@ -101,23 +101,36 @@ def create_schema(db_path: str = DB_PATH) -> None:
     """)
 
     """
-    ____________________________________________________________________________
-    |                            track status table                            |
-    ____________________________________________________________________________
-    |entryID| session ID |time | track safety status code | track surface temp | 
-    ____________________________________________________________________________
-    |   0   |    1       | 0.00|              0           |        97.2        | example data
-    ____________________________________________________________________________
+    SCHEMA:
+    _________________________________________________________________
+    |                            track status table        |        |
+    _________________________________________________________________
+    |entry_id| session_id |time | track_safety_status      | message|
+    _________________________________________________________________
+    |   0    |     1      | 000 |              0           | normal |example data
+    _________________________________________________________________
 
+    NOTE: This table tracks each time the status has been changed not on a time basis.
+          It doesn't update every {number} seconds like other tables. 
+
+    track status codes as defined by Fastf1 api:
+        '1': Track clear (beginning of session or to indicate the end
+           of another status)
+        - '2': Yellow flag (sectors are unknown)
+        - '3': ??? Never seen so far, does not exist?
+        - '4': Safety Car
+        - '5': Red Flag
+        - '6': Virtual Safety Car deployed
+        - '7': Virtual Safety Car ending (As indicated on the drivers steering wheel, on tv and so on; status '1'
+          will mark the actual end)
     """
     cur.execute("""
     CREATE TABLE IF NOT EXISTS trackStatus (
-        entryID INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id INTEGER NOT NULL, 
-        time TEXT,
-        trackTemp REAL,
-        trackSafetyStatus INTEGER, 
-        trackSurfaceTemp REAL, 
+        time REAL NOT NULL,
+        track_safety_status INTEGER NOT NULL, 
+        message TEXT NOT NULL,
         FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
     """)
@@ -137,15 +150,19 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
+    # this creates a property called by session.track_status also
     session.load()
 
     laps = session.laps.copy()
-    weather = session.weather_data.copy()
+    weather = session.weather_data.copy() 
     results = session.results.copy()  # has driver code, name, team, number, color
     total_laps = int(laps["LapNumber"].max())
     year = session.date.year
     event = session.event.EventName
+    #copy data from session.track_status
+    trackStatusDF = session.track_status.copy()
     # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
+    # - yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
     session_type = session.event.Session5
 
     # Insert into sessions table (or get existing session_id if already loaded)
@@ -229,6 +246,24 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
             ),
         )
 
+    # insert track_status
+    for _, row in trackStatusDF.iterrows():
+        """ 
+            Dataframe loaded by session.track_status:
+            {Time: datetime.timedelta, Status: str, Message: str}
+        """
+        timeStampInSeconds = row.get("Time").total_seconds()
+        statusNumCode = int(row.get("Status"))
+        message = str(row.get("Message"))
+
+        cur.execute(
+            """ 
+            INSERT INTO trackStatus (session_id, time, track_safety_status, message)
+            VALUES(?, ?, ?, ?)
+            """, 
+            (session_id, timeStampInSeconds, statusNumCode, message),
+
+        )
     conn.commit()
     conn.close()
     print(
