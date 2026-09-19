@@ -14,11 +14,10 @@ UI/__pycache__/
 dataClasses/__pycache__/
 services/__pycache__/
 graphs/__pycache__/
+ViewModels/__pycache__/
 
 #fastf1 cache
-f1_cache/*
+f1_cache/
 
-#db
-f1_data.db
-
-.gitignore
+#database
+*.db
