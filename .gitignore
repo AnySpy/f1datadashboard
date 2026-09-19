@@ -20,3 +20,5 @@ f1_cache/*
 
 #db
 f1_data.db
+
+.gitignore
