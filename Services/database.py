@@ -288,6 +288,8 @@ def _preview_db(db_path: str = DB_PATH):
     print(pd.read_sql("SELECT * FROM laps LIMIT 5", conn))
     print("\n--- Sample weather ---")
     print(pd.read_sql("SELECT * FROM weather LIMIT 5", conn))
+    print("\n --- Sample trackStatus ---")
+    print(pd.read_sql("SELECT * FROM trackStatus LIMIT 5", conn))
     conn.close()
 
 def _main():
