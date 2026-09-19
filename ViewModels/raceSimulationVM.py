@@ -17,6 +17,10 @@ class TrackStatusVM(QObject):
         self.updatedTrackSurface.emit(self.currentTrackSurface)
         self.updatedTrackSafety.emit(self.currentTrackSafety)
 
+        # fetch status codes from DB on creation
+        self.fetchSafetyStatus()
+        self.fetchSurfaceStatus()
+
 
     def setSurfaceStatus(self, newStatus: str):
         #this could affect 2 views in the Front end so may add a Signal
@@ -126,3 +130,6 @@ class RaceHandler(QObject):
     """
     def __init__(self):
             super().__init__()
+
+
+
