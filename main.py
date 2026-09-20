@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
-from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton
+from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame
 from PySide6.QtGui import *
 
 from UI.home import HomePage
@@ -13,7 +13,7 @@ from ViewModels import raceSimulationVM
 Global Vars
 """
 currentPageIndex = 0
-
+backgroundColor = "#1A1A1A"
 """
 @brief This is is the class describing UI components of the main window
         launched on startup
@@ -42,7 +42,8 @@ class MainWindow(QMainWindow):
         # create the main elements and pass down the switch page function
         self.sidebar = Sidebar(
             self.switch_page
-        )  # changed the 1st self to try to pass down currentPageIndx
+        )  
+        # changed the 1st self to try to pass down currentPageIndx
         self.home = HomePage()
         self.settings = DataAnalysisPage()
         self.driverProfiles = DriverProfiles()
@@ -73,7 +74,7 @@ class MainWindow(QMainWindow):
 """
 
 
-class Sidebar(QWidget):
+class Sidebar(QFrame):
     def __init__(self, switch_page):
         super().__init__()
         self.setFixedWidth(125)
@@ -81,6 +82,11 @@ class Sidebar(QWidget):
         # self.setMinimumWidth(40)
         self.setAutoFillBackground(True)
         self.setBackgroundRole(QPalette.Base)
+        self.setStyleSheet(
+            f"""
+                background-color: {backgroundColor};
+                border-radius: 12px;        
+            """)
 
         
         layout = QVBoxLayout(self)

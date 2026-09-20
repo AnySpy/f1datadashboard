@@ -8,19 +8,44 @@ from PySide6.QtWidgets import (
     QFrame,
 )
 
+layoutColor: str = "#bd8c77"
+gridMargin: int = 12
 """
 @brief class holding the startup page that contains a grid layout of driver sim,
        driver standings, and driver telemetry, and track data
 """
 
+class Card(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet(
+            f"""
+                background-color: {layoutColor};
+                border-radius: 12px;        
+        """)
 
 class HomePage(QWidget):
     def __init__(self):
         super().__init__()
 
         # make a grid layout of 13x11ish
-        layout = QGridLayout(self)
-        layout.addWidget(QLabel("Home Page"))
+        # grid layout (rowstart, colstart, spanrows, spancols)
+        gridLayout = QGridLayout(self)
+        gridLayout.setSpacing(gridMargin)
+        gridLayout.setSpacing(gridMargin)
+        gridLayout.setContentsMargins(gridMargin, gridMargin, gridMargin, gridMargin)
+        driverSimFrame = DriverSIM()
+        gridLayout.addWidget(driverSimFrame, 1,0, 3, 3)
+        sessionFrame = SessionSelector()
+        gridLayout.addWidget(sessionFrame, 0, 0, 1, 3)
+        driverStandingsFrame = DriverStandings()
+        gridLayout.addWidget(driverStandingsFrame, 0,3,4,1)
+        driverTelemetryCard1 = DriverTelemetry()
+        gridLayout.addWidget(driverTelemetryCard1, 4,0,1,4)
+        driverTelemetryCard2 = DriverTelemetry()
+        gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
+
+
 
 
 """
@@ -29,27 +54,32 @@ class HomePage(QWidget):
 """
 
 
-class DriverSIM(QWidget):
+
+class DriverSIM(Card):
     def __init__(self):
         super().__init__()
-
         layout = QVBoxLayout(self)
-        container = QFrame()
-        container.resize(100, 100)
-        container.setStyleSheet("background-color: red")
-        layout.addWidget(container)
+        layout.addWidget(QLabel("Race Sim"))
 
 
-class DriverStandings(QWidget):
+class DriverStandings(Card):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Driver Standings"))
+        
 
-
-class DriverTelemetry(QWidget):
+class DriverTelemetry(Card):
     def __init__(self):
         super().__init__()
+        self.setMaximumHeight(100)
         layout = QHBoxLayout(self)
         layout.addWidget(QLabel("Driver Telemetry"))
 
+class SessionSelector(Card):
+    def __init__(self):
+        super().__init__()
+        self.setMaximumHeight(50)
+        layout = QHBoxLayout(self)
+        layout.addWidget(QLabel("SessionSelector"))
+        
