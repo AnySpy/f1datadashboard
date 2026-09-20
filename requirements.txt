@@ -43,3 +43,5 @@ url-normalize==3.0.0
 urllib3==2.7.0
 websockets==17.1
 beautifulsoup4==4.15.0
+scikit-learn
+joblib
