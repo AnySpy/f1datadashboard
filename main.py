@@ -6,9 +6,9 @@ from PySide6.QtGui import *
 from UI.home import HomePage
 from UI.dataAnalysisPage import DataAnalysisPage
 from UI.driverProfiles import DriverProfiles
-from ViewModels import raceSimulationVM
 
-
+#import dbhandler
+from Services.dbhandler import DBhandler
 """
 Global Vars
 """
@@ -24,6 +24,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
+        self.dbHandler = DBhandler()
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
@@ -31,7 +32,7 @@ class MainWindow(QMainWindow):
         # initialize all view models
         #
         # create initialize track status view model
-        self.monitorTrackStatus = raceSimulationVM.TrackStatusVM()
+        #self.monitorTrackStatus = TrackStatusVM()
 
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
@@ -44,9 +45,9 @@ class MainWindow(QMainWindow):
             self.switch_page
         )  
         # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage()
-        self.settings = DataAnalysisPage()
-        self.driverProfiles = DriverProfiles()
+        self.home = HomePage(self.dbHandler)
+        self.settings = DataAnalysisPage(self.dbHandler)
+        self.driverProfiles = DriverProfiles(self.dbHandler)
 
         # add the pages to the stack
         self.stack.addWidget(self.home)

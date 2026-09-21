@@ -1,6 +1,7 @@
 import sqlite3
-from database import DB_PATH
+from Services.database import DB_PATH
 from tests.SignalTesting import redColor, resetColor
+from Services import database
 """
     SCHEMA:
     _________________________________________________________________
@@ -28,6 +29,7 @@ from tests.SignalTesting import redColor, resetColor
 class DBhandler:
     def __init__(self):
         print("loading...")
+        database._main()
         self.conn = sqlite3.connect(DB_PATH)
         #might be able to estimate this based off of rainfall and driver comms 
     def getTrackSurfaceData(self, approxTime: float) -> dict:
@@ -104,8 +106,10 @@ class DBhandler:
         trackTableData: tuple
         if(currentIndex == -1):
             # pull data via entry_id
+            print("searching db via approx time")
             trackTableData = self.getDataFromTable(tableName= "trackStatus", searchBy= "time", searchData= approxTime, attributeNameTuple= ("entry_id", "time", "track_safety_status", "message"))
         elif(approxTime == 0.00):
+            print("searching db via index")
             trackTableData = self.getDataFromTable(tableName= "trackStatus", searchBy= "entry_id", searchData= currentIndex, attributeNameTuple= ("entry_id", "time", "track_safety_status", "message"))
             #pull data via approxTime
         
@@ -114,12 +118,14 @@ class DBhandler:
             print("SET END FLAG")
         
         trackStatusData: dict = {"entry_id" : int, "time": float, "statusCode" : int, "message" : str, "endFlag": endFlag}
+        
         # set trackStatusData to send to trackStatusVM
         trackStatusData["entry_id"] = trackTableData[0]
         trackStatusData["time"] = trackTableData[1]
         trackStatusData["statusCode"] = trackTableData[2]
         trackStatusData["message"] = trackTableData[3]
         trackStatusData["endFlag"] = endFlag
+        print(trackStatusData)
         return trackStatusData
 
     

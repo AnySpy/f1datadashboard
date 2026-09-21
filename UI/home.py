@@ -1,4 +1,8 @@
 # basic test application
+from PySide6.QtCore import Signal
+from UI.Theme import theme
+from ViewModels.raceSimulationVM import TrackStatusVM
+from Services.dbhandler import DBhandler
 from PySide6.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -8,14 +12,19 @@ from PySide6.QtWidgets import (
     QFrame,
 )
 
-layoutColor: str = "#bd8c77"
+layoutColor: str = theme.info
 gridMargin: int = 12
-"""
-@brief class holding the startup page that contains a grid layout of driver sim,
-       driver standings, and driver telemetry, and track data
-"""
 
+"""
+    TODO: 
+    - write documentation for each class
+"""
 class Card(QFrame):
+    """_summary_
+
+    Args:
+        QFrame (QWidget): _generates a basic layout for each other card_
+    """
     def __init__(self):
         super().__init__()
         self.setStyleSheet(
@@ -24,17 +33,53 @@ class Card(QFrame):
                 border-radius: 12px;        
         """)
 
-class HomePage(QWidget):
-    def __init__(self):
+class DriverCard(QFrame):
+    def __init__(self, driverName, currentPlacement):
         super().__init__()
 
+class TrackStatusCard(Card):
+    """_creates a card that shows updated data from the VM_
+
+    Args:
+        Card (QFrame): _description_
+    """    
+    def __init__(self, trackStatusVM: TrackStatusVM):
+        super().__init__()
+        self.setStyleSheet(f"""background-color: {theme.background}""")
+        #create an instance of the VM
+        self.trackStatusVM = trackStatusVM
+        #stub info while waiting for race to load
+        self.message: str = "No Data Loaded..."
+        #formating layout
+        layout = QHBoxLayout(self)
+        #create the label that will be updated
+        self.statusLabel = QLabel(self.message)
+        layout.addWidget(self.statusLabel)
+
+        #connect to the VM
+        self.trackStatusVM.updatedTrackSafety.connect(self.onStatusChange)
+
+
+    def onStatusChange(self, status:str):
+        print("status changed")
+        print(status)
+        self.message = status
+        self.statusLabel.setText(self.message)
+
+        
+
+        
+class HomePage(QWidget):
+    def __init__(self, databaseManager: DBhandler):
+        super().__init__()
+        self.monitorTrackStatus = TrackStatusVM(databaseManager)
         # make a grid layout of 13x11ish
         # grid layout (rowstart, colstart, spanrows, spancols)
         gridLayout = QGridLayout(self)
         gridLayout.setSpacing(gridMargin)
         gridLayout.setSpacing(gridMargin)
         gridLayout.setContentsMargins(gridMargin, gridMargin, gridMargin, gridMargin)
-        driverSimFrame = DriverSIM()
+        driverSimFrame = DriverSIM(trackStatus = self.monitorTrackStatus)
         gridLayout.addWidget(driverSimFrame, 1,0, 3, 3)
         sessionFrame = SessionSelector()
         gridLayout.addWidget(sessionFrame, 0, 0, 1, 3)
@@ -44,21 +89,17 @@ class HomePage(QWidget):
         gridLayout.addWidget(driverTelemetryCard1, 4,0,1,4)
         driverTelemetryCard2 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
-
-
-
-
-"""
-@brief driver simulation of the race
-@notes this should take up the most space
-"""
-
+        self.monitorTrackStatus.fetchSafetyStatus()
 
 
 class DriverSIM(Card):
-    def __init__(self):
+    def __init__(self, trackStatus: TrackStatusVM):
         super().__init__()
         layout = QVBoxLayout(self)
+        #create the track status card that will sit inside of the race sim
+        self.trackStatusCard = TrackStatusCard(trackStatus)
+        layout.addWidget(self.trackStatusCard)
+        # this will hold the simulated race
         layout.addWidget(QLabel("Race Sim"))
 
 
