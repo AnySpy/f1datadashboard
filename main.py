@@ -1,19 +1,19 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
-from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton
+from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame
 from PySide6.QtGui import *
 
 from UI.home import HomePage
 from UI.dataAnalysisPage import DataAnalysisPage
 from UI.driverProfiles import DriverProfiles
-from ViewModels import raceSimulationVM
 
-
+#import dbhandler
+from Services.dbhandler import DBhandler
 """
 Global Vars
 """
 currentPageIndex = 0
-
+backgroundColor = "#1A1A1A"
 """
 @brief This is is the class describing UI components of the main window
         launched on startup
@@ -24,6 +24,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
+        self.dbHandler = DBhandler()
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
@@ -31,7 +32,7 @@ class MainWindow(QMainWindow):
         # initialize all view models
         #
         # create initialize track status view model
-        self.monitorTrackStatus = raceSimulationVM.TrackStatusVM()
+        #self.monitorTrackStatus = TrackStatusVM()
 
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
@@ -42,10 +43,11 @@ class MainWindow(QMainWindow):
         # create the main elements and pass down the switch page function
         self.sidebar = Sidebar(
             self.switch_page
-        )  # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage()
-        self.settings = DataAnalysisPage()
-        self.driverProfiles = DriverProfiles()
+        )  
+        # changed the 1st self to try to pass down currentPageIndx
+        self.home = HomePage(self.dbHandler)
+        self.settings = DataAnalysisPage(self.dbHandler)
+        self.driverProfiles = DriverProfiles(self.dbHandler)
 
         # add the pages to the stack
         self.stack.addWidget(self.home)
@@ -73,7 +75,7 @@ class MainWindow(QMainWindow):
 """
 
 
-class Sidebar(QWidget):
+class Sidebar(QFrame):
     def __init__(self, switch_page):
         super().__init__()
         self.setFixedWidth(125)
@@ -81,6 +83,11 @@ class Sidebar(QWidget):
         # self.setMinimumWidth(40)
         self.setAutoFillBackground(True)
         self.setBackgroundRole(QPalette.Base)
+        self.setStyleSheet(
+            f"""
+                background-color: {backgroundColor};
+                border-radius: 12px;        
+            """)
 
         
         layout = QVBoxLayout(self)

@@ -1,25 +1,25 @@
 from PySide6.QtCore import QObject, Signal
-
+from Services.dbhandler import DBhandler
 class TrackStatusVM(QObject):
     """
     TODO:
         - refactor track status fetch functions to work with getting info from the db
+        - add currentIndex and approxTime to the vars on init
+        - add logic to determine if track is wet or dry
     """
     #Signals
     updatedTrackSafety = Signal(str) #normal, yellow flag, red flag 
     updatedTrackSurface = Signal(str) #normal, damp, hot, etc.
 
-    def __init__(self):
+    def __init__(self, dbHandler: DBhandler):
         super().__init__()
         # on init set Signals and class vars to normal
         self.currentTrackSafety = "normal"
         self.currentTrackSurface = "normal"
-        self.updatedTrackSurface.emit(self.currentTrackSurface)
-        self.updatedTrackSafety.emit(self.currentTrackSafety)
-
+        #self.updatedTrackSurface.emit(self.currentTrackSurface)
+        #self.updatedTrackSafety.emit(self.currentTrackSafety)
+        self.dbHandler = dbHandler
         # fetch status codes from DB on creation
-        self.fetchSafetyStatus()
-        self.fetchSurfaceStatus()
 
 
     def setSurfaceStatus(self, newStatus: str):
@@ -29,6 +29,14 @@ class TrackStatusVM(QObject):
             self.updatedTrackSurface.emit(newStatus)
 
     def setSafetyStatus(self, newStatus: str):
+        """_summary_
+
+        Args:
+            newStatus (str): _this is the new status that was grabbed from database_
+
+        Returns:
+            _int_: _returns 0 if there are no errors_
+        """        
         # might need to run a check that newstatus is an accepted status
         if (newStatus != self.currentTrackSafety):
             self.currentTrackSafety = newStatus
@@ -41,12 +49,15 @@ class TrackStatusVM(QObject):
     
     def getSurfaceStatus(self):
         return self.currentTrackSurface
-
+    #  approxTime: float = 0.00, currentSessionID: int = 1, currentIndex: int = -1, endFlag: bool = False
     def fetchSafetyStatus(self):
+        """_grabs data from the dbHandler and calls to set the safety status_
+        
+        """        
         # fetch status from DB
-        #newStatus = dbHandler.getSafetyStatus()
+        newStatus = self.dbHandler.getTrackSafetyStatus(currentSessionID= 1, currentIndex= 1, endFlag= False )
         #stub value need to wright a try except block for getting data from db
-        self.setSafetyStatus("test")
+        self.setSafetyStatus(newStatus["message"])
 
     def fetchSurfaceStatus(self):
         # fetch status from DB

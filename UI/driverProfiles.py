@@ -2,13 +2,14 @@ from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushBu
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 import typing
+from Services.dbhandler import DBhandler
 
 """
 @brief page for the driver profiles
 """
 
 class DriverProfiles(QWidget):
-    def __init__(self):
+    def __init__(self, dbHandler: DBhandler):
         super().__init__()
 
         layout = QVBoxLayout(self)
