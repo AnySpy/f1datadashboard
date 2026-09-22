@@ -1,18 +1,17 @@
 from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy, QScrollArea, QGridLayout
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
-import typing
-from Services.dbhandler import DBhandler
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
+import typing
 
 """
 @brief page for the driver profiles
 """
 
 class DriverProfiles(QWidget):
-    def __init__(self, dbHandler: DBhandler):
+    def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
-        self.view_model = DriverProfilesViewModel()
+        self.view_model = view_model
 
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -133,7 +132,7 @@ class DriverStatsSection(QWidget):
         self.view_model = view_model
 
         # TODO: Replace with a name argument later
-        driver_stats = self.view_model.scraper.fetch_driver_stats("max-verstappen")
+        driver_stats = self.view_model.get_career_stats("max-verstappen")
 
         # TODO: Pull this from Viewmodel later
         placement_history = [8, 1, 2, 1, 4]

@@ -2,7 +2,6 @@
 from PySide6.QtCore import Signal
 from UI.Theme import theme
 from ViewModels.raceSimulationVM import TrackStatusVM
-from Services.dbhandler import DBhandler
 from PySide6.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -70,9 +69,9 @@ class TrackStatusCard(Card):
 
         
 class HomePage(QWidget):
-    def __init__(self, databaseManager: DBhandler):
+    def __init__(self, view_model: TrackStatusVM):
         super().__init__()
-        self.monitorTrackStatus = TrackStatusVM(databaseManager)
+        self.monitorTrackStatus = view_model
         # make a grid layout of 13x11ish
         # grid layout (rowstart, colstart, spanrows, spancols)
         gridLayout = QGridLayout(self)

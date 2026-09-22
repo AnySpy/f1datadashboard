@@ -7,6 +7,11 @@ from UI.home import HomePage
 from UI.dataAnalysisPage import DataAnalysisPage
 from UI.driverProfiles import DriverProfiles
 
+# Import VMs
+from ViewModels.driverProfilesVM import DriverProfilesViewModel
+from ViewModels.playControlsVM import PlayControlsViewModel
+from ViewModels.raceSimulationVM import TrackStatusVM
+
 #import dbhandler
 from Services.dbhandler import DBhandler
 """
@@ -25,6 +30,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
         self.dbHandler = DBhandler()
+        self.driverProfilesVM = DriverProfilesViewModel()
+        self.trackStatusVM = TrackStatusVM(self.dbHandler)
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
@@ -45,9 +52,10 @@ class MainWindow(QMainWindow):
             self.switch_page
         )  
         # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage(self.dbHandler)
-        self.settings = DataAnalysisPage(self.dbHandler)
-        self.driverProfiles = DriverProfiles(self.dbHandler)
+        self.home = HomePage(self.trackStatusVM)
+        self.settings = DataAnalysisPage()
+        # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here, 
+        self.driverProfiles = DriverProfiles(self.driverProfilesVM)
 
         # add the pages to the stack
         self.stack.addWidget(self.home)
