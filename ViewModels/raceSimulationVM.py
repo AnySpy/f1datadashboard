@@ -1,6 +1,5 @@
 from PySide6.QtCore import QObject, Signal
 from Services.dbhandler import DBhandler
-
 class TrackStatusVM(QObject):
     """
     TODO:
@@ -12,14 +11,14 @@ class TrackStatusVM(QObject):
     updatedTrackSafety = Signal(str) #normal, yellow flag, red flag 
     updatedTrackSurface = Signal(str) #normal, damp, hot, etc.
 
-    def __init__(self):
+    def __init__(self, dbHandler: DBhandler):
         super().__init__()
         # on init set Signals and class vars to normal
         self.currentTrackSafety = "normal"
         self.currentTrackSurface = "normal"
         #self.updatedTrackSurface.emit(self.currentTrackSurface)
         #self.updatedTrackSafety.emit(self.currentTrackSafety)
-        self.dbHandler = DBhandler()
+        self.dbHandler = dbHandler
         # fetch status codes from DB on creation
 
 
