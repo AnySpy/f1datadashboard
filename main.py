@@ -45,9 +45,10 @@ class MainWindow(QMainWindow):
             self.switch_page
         )  
         # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage(self.dbHandler)
-        self.settings = DataAnalysisPage(self.dbHandler)
-        self.driverProfiles = DriverProfiles(self.dbHandler)
+        self.home = HomePage()
+        self.settings = DataAnalysisPage()
+        # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here, 
+        self.driverProfiles = DriverProfiles()
 
         # add the pages to the stack
         self.stack.addWidget(self.home)

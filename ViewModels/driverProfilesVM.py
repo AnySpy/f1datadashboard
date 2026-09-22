@@ -55,23 +55,30 @@ class DriverProfilesViewModel(QObject):
                 placement_string = f"{place}th"
         return placement_string
 
-    def load_driver_stats(self, driver_name: str) -> dict[str, str]:
+    def _load_driver_stats(self, driver_name: str, scope: str) -> dict[str, str]:
         """Loads the driver stats from the F1 website
 
         Args:
             driver_name (str): The name of the driver in firstname-lastname format (e.g. "max-verstappen")
+            scope (str): Whether to use the scope of "season" or "career" for stats.
 
         Returns:
-            dict[str, str]: The stats 
+            dict[str, str]: The stats returned in a pairing of "Title": "Value"
         """
         data = self.scraper.fetch_driver_stats(driver_name)
 
         if not data:
-            self.current_stats = {"ERROR": "Data Unavailable"}
-        else:
-            self.current_stats = data
+            return {"ERROR": "Data Unavailable"}
+
+        self.current_stats = data[scope]
 
         return self.current_stats
+
+    def get_season_stats(self, driver_name: str):
+        return self._load_driver_stats(driver_name, "season")
+
+    def get_career_stats(self, driver_name: str):
+        return self._load_driver_stats(driver_name, "career")
             
 
     def setActiveDriver(self):
@@ -84,3 +91,13 @@ class DriverProfilesViewModel(QObject):
         return 0
 
     
+def _main():
+    vm_test = DriverProfilesViewModel()
+    data = vm_test.get_career_stats("max-verstappen")
+
+    print(data)
+
+    return 0
+
+if __name__ == '__main__':
+    _main()
