@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy, QScrollArea
+from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy, QScrollArea, QGridLayout
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 import typing
@@ -14,29 +14,21 @@ class DriverProfiles(QWidget):
         super().__init__()
         self.view_model = DriverProfilesViewModel()
 
-        layout = QVBoxLayout(self)
-        layout.setSpacing(0)
-        information_layout = QHBoxLayout()
-        information_layout.setContentsMargins(0, 0, 0, 0)
-        information_layout.setSpacing(0)
+        grid = QGridLayout(self)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(0)
 
         self.nav_bar = DriverNavBar()
-        layout.addWidget(self.nav_bar)
+        grid.addWidget(self.nav_bar, 0, 0, 1, 2)
 
         self.driver_about_section = DriverAboutSection()
-        self.driver_about_section.setContentsMargins(0, 0, 0, 0)
-        information_layout.addWidget(self.driver_about_section)
-
-        self.vertical_line = QFrame(frameShape=QFrame.Shape.VLine)
-        self.vertical_line.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        self.vertical_line.setContentsMargins(0, 0, 0, 0)
-        information_layout.addWidget(self.vertical_line)
+        grid.addWidget(self.driver_about_section, 1, 0)
 
         self.driver_stats_section = DriverStatsSection(self.view_model)
-        self.driver_stats_section.setContentsMargins(0, 0, 0, 0)
-        information_layout.addWidget(self.driver_stats_section)
+        grid.addWidget(self.driver_stats_section, 1, 1)
 
-        layout.addLayout(information_layout)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
 
 # Top nav bar. This should probably be a search bar in hindsight, but I like the design of this right now so we're going with it.
 class DriverNavBar(QWidget):
@@ -70,9 +62,7 @@ class DriverNavBar(QWidget):
 
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        layout.addStretch()
 
 # Left side, contains a picture, the name of the driver, and their biography
 class DriverAboutSection(QWidget):
@@ -100,19 +90,19 @@ class DriverAboutSection(QWidget):
         painter.setClipPath(painter_path)
         painter.drawPixmap(0, 0, image)
         painter.end()
+
         image_holder = QLabel()
         image_holder.setPixmap(canvas)
         image_holder.setFixedSize(100, 100)
         
         name = QLabel("NAME")
-
         horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
-
         about = QLabel("ABOUT")
 
         about_text = QLabel("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
         about_text.setWordWrap(True)
         about_text.setAlignment(Qt.AlignmentFlag.AlignJustify)
+
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(about_text)
@@ -152,7 +142,6 @@ class DriverStatsSection(QWidget):
         layout = QVBoxLayout(self)
         placements = QVBoxLayout()
         race_history = QHBoxLayout()
-        career_stats = QVBoxLayout()
 
         placements_text = QLabel("Placements")
         placements.addWidget(placements_text, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -177,41 +166,43 @@ class DriverStatsSection(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(race_widget)
+        scroll_area.setFixedHeight(110)
 
-        horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
 
+        career_stats_layout = QGridLayout()
         career_stats_title = QLabel("Career Stats")
-        career_stats.addWidget(career_stats_title, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        for title, stat in driver_stats.items():
-            self._populate_career_stats(career_stats, title, stat)
+
+        career_stats_layout.addWidget(career_stats_title, 0, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        for row_idx, (title, stat) in enumerate(driver_stats.items(), start=1):
+            self._populate_career_stats(career_stats_layout, row_idx, title, stat)
 
         career_stats_widget = QWidget()
-        career_stats_widget.setLayout(career_stats)
+        career_stats_widget.setLayout(career_stats_layout)
+
         career_stats_scroll = QScrollArea()
         career_stats_scroll.setWidgetResizable(True)
         career_stats_scroll.setWidget(career_stats_widget)
 
-        scroll_area.setFixedHeight(110)
-        career_stats.setContentsMargins(10, 10, 10, 10)
-
         placements.addWidget(scroll_area)
         layout.addLayout(placements)
-        layout.addWidget(horizontal_line)
+        layout.addWidget(QFrame(frameShape=QFrame.Shape.HLine))
         layout.addWidget(career_stats_scroll)
 
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
-
         layout.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addStretch()
 
-    def _populate_career_stats(self, parent_container: QVBoxLayout, label: str, data: typing.Any) -> None:
-        container = QHBoxLayout()
+    def _populate_career_stats(self, grid: QGridLayout, row: int, label: str, data: typing.Any) -> None:
         _label = QLabel(label)
         _data = QLabel(data)
-        container.addWidget(_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        container.addWidget(_data, alignment=Qt.AlignmentFlag.AlignRight)
-        parent_container.addLayout(container)
-        parent_container.addWidget(QFrame(frameShape=QFrame.Shape.HLine))
+
+        # ? Leaves space for the horizontal divider between each row
+        grid_row = row * 2
+
+        grid.addWidget(_label, grid_row, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(_data, grid_row, 1, alignment=Qt.AlignmentFlag.AlignRight)
+
+        horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
+        grid.addWidget(horizontal_line, grid_row + 1, 0, 1, 2)
                 
