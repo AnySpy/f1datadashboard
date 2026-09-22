@@ -29,7 +29,7 @@ from Services import database
 class DBhandler:
     def __init__(self):
         print("loading...")
-        database._main()
+        database.create_schema()
         self.conn = sqlite3.connect(DB_PATH)
         #might be able to estimate this based off of rainfall and driver comms 
     def getTrackSurfaceData(self, approxTime: float) -> dict:

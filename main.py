@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame
-from PySide6.QtGui import *
+from PySide6.QtGui import QPalette, Qt
 
 from UI.home import HomePage
 from UI.dataAnalysisPage import DataAnalysisPage
@@ -82,7 +82,7 @@ class Sidebar(QFrame):
         # self.setMaximumWidth(150)
         # self.setMinimumWidth(40)
         self.setAutoFillBackground(True)
-        self.setBackgroundRole(QPalette.Base)
+        self.setBackgroundRole(QPalette.ColorRole.Base)
         self.setStyleSheet(
             f"""
                 background-color: {backgroundColor};
@@ -91,20 +91,20 @@ class Sidebar(QFrame):
 
         
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         changePageBtn = QPushButton("Home")
         # removes window auto focussing to this button on launch
-        changePageBtn.setFocusPolicy(Qt.NoFocus)
+        changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(0))
         layout.addWidget(changePageBtn)
 
         changePageBtn = QPushButton("Data Analysis")
-        changePageBtn.setFocusPolicy(Qt.NoFocus)
+        changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(1))
         layout.addWidget(changePageBtn)
 
         changePageBtn = QPushButton("Driver Profiles")
-        changePageBtn.setFocusPolicy(Qt.NoFocus)
+        changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(2))
         layout.addWidget(changePageBtn)
 
