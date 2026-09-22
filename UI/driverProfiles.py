@@ -9,9 +9,9 @@ import typing
 """
 
 class DriverProfiles(QWidget):
-    def __init__(self):
+    def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
-        self.view_model = DriverProfilesViewModel()
+        self.view_model = view_model
 
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
