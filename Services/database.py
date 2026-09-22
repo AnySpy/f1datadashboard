@@ -7,10 +7,6 @@
 # data from the fastf1 API into it, so you can show a working example.
 # ==========================================================================
 
-# ! Problems:
-# !     Calls to the database needs to have a unique key to make sure the event is available during a quick lookup.
-# !             We could pass the entire EventSchedule to a frontend helper function to not mangle the data while still presenting the EventName to the user?
-# !     We need a way to mark whether an event is a future event and we need to update those events with final standings when they hit the API.
 
 # %% [1] IMPORTS ------------------------------------------------------------
 import sqlite3
@@ -28,7 +24,6 @@ DB_PATH = "f1_data.db"
 
 
 # %% [2] CREATE THE DATABASE SCHEMA ------------------------------------------
-# ! This MUST be run at startup. We need somewhere to call this that only runs on init of the app/loss of viable database.
 def create_schema(db_path: str = DB_PATH) -> None:
     """Defines the database
 

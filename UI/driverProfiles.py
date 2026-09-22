@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 import typing
 from Services.dbhandler import DBhandler
+from ViewModels.driverProfilesVM import DriverProfilesViewModel
 
 """
 @brief page for the driver profiles
@@ -11,6 +12,7 @@ from Services.dbhandler import DBhandler
 class DriverProfiles(QWidget):
     def __init__(self, dbHandler: DBhandler):
         super().__init__()
+        self.view_model = DriverProfilesViewModel()
 
         layout = QVBoxLayout(self)
         layout.setSpacing(0)
@@ -30,7 +32,7 @@ class DriverProfiles(QWidget):
         self.vertical_line.setContentsMargins(0, 0, 0, 0)
         information_layout.addWidget(self.vertical_line)
 
-        self.driver_stats_section = DriverStatsSection()
+        self.driver_stats_section = DriverStatsSection(self.view_model)
         self.driver_stats_section.setContentsMargins(0, 0, 0, 0)
         information_layout.addWidget(self.driver_stats_section)
 
@@ -136,13 +138,16 @@ class DriverAboutSection(QWidget):
 
 # Right side, contains their placement history and their career stats
 class DriverStatsSection(QWidget):
-    def __init__(self):
+    def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
+        self.view_model = view_model
 
-        # TODO: Pull this from DB
+        # TODO: Replace with a name argument later
+        driver_stats = self.view_model.scraper.fetch_driver_stats("max-verstappen")
+
+        # TODO: Pull this from Viewmodel later
         placement_history = [8, 1, 2, 1, 4]
         location_history = ["London", "Paris", "Norway", "Quatar", "Turkey"]
-        stats = ["38", "442", "1 (x8)", "15", "1 (x6)", "6", "0", "5"]
 
         layout = QVBoxLayout(self)
         placements = QVBoxLayout()
@@ -151,14 +156,16 @@ class DriverStatsSection(QWidget):
 
         placements_text = QLabel("Placements")
         placements.addWidget(placements_text, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        for i in range(len(placement_history)):        
+
+        formatted_cards = self.view_model.get_formatted_placements(placement_history, location_history)
+
+        for placement_str, location_str in formatted_cards:
             card_frame = QFrame()
             card_frame.setFrameShape(QFrame.Shape.StyledPanel)
             card_frame.setFixedSize(70, 70)
             card_layout = QVBoxLayout(card_frame)
-            placement_label = QLabel(self._placement_naming(placement_history[i]))
-            location_label = QLabel(location_history[i])
+            placement_label = QLabel(placement_str)
+            location_label = QLabel(location_str)
             card_layout.addWidget(placement_label, alignment=Qt.AlignmentFlag.AlignCenter)
             card_layout.addWidget(location_label, alignment=Qt.AlignmentFlag.AlignCenter)
             race_history.addWidget(card_frame)
@@ -175,15 +182,9 @@ class DriverStatsSection(QWidget):
 
         career_stats_title = QLabel("Career Stats")
         career_stats.addWidget(career_stats_title, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        self._populate_career_stats(career_stats, "Grand Prix Entered", stats[0])
-        self._populate_career_stats(career_stats, "Career Points", stats[1])
-        self._populate_career_stats(career_stats, "Highest Race Finish", stats[2])
-        self._populate_career_stats(career_stats, "Podiums", stats[3])
-        self._populate_career_stats(career_stats, "Highest Grid Position", stats[4])
-        self._populate_career_stats(career_stats, "Pole Position", stats[5])
-        self._populate_career_stats(career_stats, "World Championships", stats[6])
-        self._populate_career_stats(career_stats, "DNFs", stats[7])
+        
+        for title, stat in driver_stats.items():
+            self._populate_career_stats(career_stats, title, stat)
 
         career_stats_widget = QWidget()
         career_stats_widget.setLayout(career_stats)
@@ -213,20 +214,4 @@ class DriverStatsSection(QWidget):
         container.addWidget(_data, alignment=Qt.AlignmentFlag.AlignRight)
         parent_container.addLayout(container)
         parent_container.addWidget(QFrame(frameShape=QFrame.Shape.HLine))
-
-    def _placement_naming(self, place: int) -> str:
-        placement_string = ""
-
-        match place:
-            case 1:
-                placement_string = "1st"
-            case 2:
-                placement_string = "2nd"
-            case 3:
-                placement_string = "3rd"
-            case _:
-                placement_string = f"{place}th"
-
-        return placement_string
-
                 
