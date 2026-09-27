@@ -2,7 +2,7 @@ from PySide6.QtCore import QObject, Signal, QByteArray, Qt
 from Services.stat_scraper import DriverStatScraper
 from Services.dbhandler import DBhandler
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
-import typing
+
 
 class DriverProfilesViewModel(QObject):
     """_summary_
@@ -13,7 +13,7 @@ class DriverProfilesViewModel(QObject):
     Methods:
         - fetchDriverInfo(season, session, race)
 
-    
+
     Variables:
         - driver1 from class
         - driver2 from class
@@ -83,11 +83,16 @@ class DriverProfilesViewModel(QObject):
             # TODO: This should be replaced with a generic "Driver Not Found eventually"
             pixmap = QPixmap("images/sample_driver.jpg")
 
-        # ? The idea is that we scale the image down to 100x100, create a canvas object of the same size, 
+        # ? The idea is that we scale the image down to 100x100, create a canvas object of the same size,
         # ?     create a painter object with a circular path that then paints the image as a circle onto the canvas,
         # ?     and then creates a label holder for that image to display the canvas in the UI.
         # ? It's kind of disgusting and I hate it but I couldn't figure out how to do it in QSS. If we could figure that out, it'd be much better.
-        image = pixmap.scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+        image = pixmap.scaled(
+            100,
+            100,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
         canvas = QPixmap(100, 100)
         canvas.fill(Qt.GlobalColor.transparent)
         painter = QPainter(canvas)
@@ -100,13 +105,14 @@ class DriverProfilesViewModel(QObject):
 
         return canvas
 
-
-    def get_formatted_placements(self, placement_history: list[int], location_history: list[str]) -> list[tuple[str, str]]:
+    def get_formatted_placements(
+        self, placement_history: list[int], location_history: list[str]
+    ) -> list[tuple[str, str]]:
         """When supplied with a list of placement history and the corresponding locations of those placements, will format the placement and place them in a tuple
 
         Args:
             placement_history (list[int]): The list of placements of the drivers as integers
-            location_history (list[str]): The list of 
+            location_history (list[str]): The list of
 
         Returns:
             list[tuple[str, str]]: _description_
@@ -162,7 +168,7 @@ class DriverProfilesViewModel(QObject):
         driver_name = driver_dict[driver_code]
         # ? We store a copy of the driver name to display before replacing it for URL purposes
         _driver_display_name = driver_name
-        driver_name = driver_name.lower().replace(' ', '-')
+        driver_name = driver_name.lower().replace(" ", "-")
 
         career_stats = self.get_career_stats(driver_name)
         bio_text = self.get_driver_bio(driver_name)
@@ -179,15 +185,15 @@ class DriverProfilesViewModel(QObject):
         self.img_loaded.emit(driver_img)
 
     def setActiveDriver(self):
-        #stub
+        # stub
         return 0
 
-    #dataType historical, seasonData, teamData
+    # dataType historical, seasonData, teamData
     def fetchDriverData(self, session: str):
-        #stub
+        # stub
         return 0
 
-    
+
 def _main():
     dbhandler = DBhandler()
 
@@ -199,5 +205,6 @@ def _main():
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     _main()

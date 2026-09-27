@@ -12,8 +12,9 @@ from ViewModels.driverProfilesVM import DriverProfilesViewModel
 from ViewModels.playControlsVM import PlayControlsViewModel
 from ViewModels.raceSimulationVM import TrackStatusVM
 
-#import dbhandler
+# import dbhandler
 from Services.dbhandler import DBhandler
+
 """
 Global Vars
 """
@@ -39,7 +40,7 @@ class MainWindow(QMainWindow):
         # initialize all view models
         #
         # create initialize track status view model
-        #self.monitorTrackStatus = TrackStatusVM()
+        # self.monitorTrackStatus = TrackStatusVM()
 
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
@@ -48,13 +49,11 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
 
         # create the main elements and pass down the switch page function
-        self.sidebar = Sidebar(
-            self.switch_page
-        )  
+        self.sidebar = Sidebar(self.switch_page)
         # changed the 1st self to try to pass down currentPageIndx
         self.home = HomePage(self.trackStatusVM)
         self.settings = DataAnalysisPage()
-        # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here, 
+        # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here,
         self.driverProfiles = DriverProfiles(self.driverProfilesVM)
 
         # add the pages to the stack
@@ -95,9 +94,9 @@ class Sidebar(QFrame):
             f"""
                 background-color: {backgroundColor};
                 border-radius: 12px;        
-            """)
+            """
+        )
 
-        
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         changePageBtn = QPushButton("Home")
@@ -123,13 +122,14 @@ class Sidebar(QFrame):
     def updateHightlight(self):
         print("update button highlight")
 
+
 def _main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.resize(700, 300)
     window.show()
     sys.exit(app.exec())
-       
+
 
 if __name__ == "__main__":
     _main()

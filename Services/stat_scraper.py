@@ -1,15 +1,15 @@
-from requests import get
-from re import compile, IGNORECASE
+from re import compile
 from bs4 import BeautifulSoup, Tag
 from requests_ratelimiter import LimiterSession
 import typing
 
+
 class DriverStatScraper:
     def __init__(self):
         self.session = LimiterSession(per_second=2, per_minute=60)
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        })
+        self.session.headers.update(
+            {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
 
     def fetch_driver_stats(self, driver_name: str) -> dict[str, dict[str, str]]:
         """Gets the stats of the provided driver
@@ -76,7 +76,9 @@ class DriverStatScraper:
             # ? Titles are stored in the class "DataGrid-module_title" and values are stored in "DataGrid-module_description"
             # ? This has to use regex because of PyLance. We probably *could* have just passed a string to `class_` but I don't want to fight PyLance.
             title_elem = item.find("dt", class_=compile(r"^DataGrid-module_title"))
-            value_elem = item.find("dd", class_=compile(r"^DataGrid-module_description"))
+            value_elem = item.find(
+                "dd", class_=compile(r"^DataGrid-module_description")
+            )
 
             # ? Can return None and PyLance gets upset if we don't have this check
             if title_elem and value_elem:
@@ -97,8 +99,10 @@ class DriverStatScraper:
         soup = BeautifulSoup(r.text, "html.parser")
 
         bio_heading = soup.find(
-            lambda tag: tag.name in ["h2", "h3", "h4", "p"]
-            and "BIOGRAPHY" in tag.get_text().upper()
+            lambda tag: (
+                tag.name in ["h2", "h3", "h4", "p"]
+                and "BIOGRAPHY" in tag.get_text().upper()
+            )
         )
 
         if not bio_heading:
@@ -118,6 +122,7 @@ class DriverStatScraper:
 
         return bio_text if bio_text else "Biography Not Available."
 
+
 def _main():
     name = "max-verstappen"
     scraper = DriverStatScraper()
@@ -128,5 +133,6 @@ def _main():
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     _main()

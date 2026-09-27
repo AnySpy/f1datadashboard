@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class DayTheme:
     # UI colors
@@ -12,5 +13,6 @@ class DayTheme:
     warning: str = "#fff200"
     danger: str = "#e33d3d"
     info: str = "#3e85d1"
+
 
 theme = DayTheme()

@@ -1,4 +1,14 @@
-from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy, QScrollArea, QGridLayout
+from PySide6.QtWidgets import (
+    QLabel,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QFrame,
+    QSizePolicy,
+    QScrollArea,
+    QGridLayout,
+)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
@@ -7,6 +17,7 @@ import typing
 """
 @brief page for the driver profiles
 """
+
 
 class DriverProfiles(QWidget):
     def __init__(self, view_model: DriverProfilesViewModel):
@@ -31,7 +42,7 @@ class DriverProfiles(QWidget):
         self.view_model.img_loaded.connect(self.driver_about_section.update_img)
 
         grid.addWidget(self.driver_about_section, 1, 0)
-        
+
         # TODO: We lost a vertical line here :(
 
         self.driver_stats_section = DriverStatsSection(self.view_model)
@@ -39,6 +50,7 @@ class DriverProfiles(QWidget):
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+
 
 # Top nav bar. This should probably be a search bar in hindsight, but I like the design of this right now so we're going with it.
 class DriverNavBar(QWidget):
@@ -56,7 +68,9 @@ class DriverNavBar(QWidget):
         vertical_line = QFrame(frameShape=QFrame.Shape.VLine)
         horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
 
-        vertical_line.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        vertical_line.setSizePolicy(
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding
+        )
 
         driver_container.addWidget(driver_labels)
         driver_container.addWidget(vertical_line)
@@ -64,7 +78,9 @@ class DriverNavBar(QWidget):
         for driver in drivers:
             driver_button = QPushButton(driver)
 
-            driver_button.clicked.connect(lambda checked=False, code=driver: self._on_driver_button_clicked(code))
+            driver_button.clicked.connect(
+                lambda checked=False, code=driver: self._on_driver_button_clicked(code)
+            )
 
             driver_container.addWidget(driver_button)
 
@@ -88,6 +104,7 @@ class DriverNavBar(QWidget):
     def _on_driver_button_clicked(self, code):
         self.driver_selected.emit(code)
 
+
 # Left side, contains a picture, the name of the driver, and their biography
 class DriverAboutSection(QWidget):
     driver_bio = Signal(str)
@@ -105,7 +122,7 @@ class DriverAboutSection(QWidget):
         self.image_holder = QLabel()
         self.image_holder.setPixmap(QPixmap("images/sample_driver.jpg"))
         self.image_holder.setFixedSize(100, 100)
-        
+
         self.name = QLabel("NAME")
         horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
         about = QLabel("ABOUT")
@@ -146,6 +163,7 @@ class DriverAboutSection(QWidget):
     def update_img(self, pixmap: QPixmap) -> None:
         self.image_holder.setPixmap(pixmap)
 
+
 # Right side, contains their placement history and their career stats
 class DriverStatsSection(QWidget):
     def __init__(self, view_model: DriverProfilesViewModel):
@@ -163,7 +181,9 @@ class DriverStatsSection(QWidget):
         placements_text = QLabel("Placements")
         placements.addWidget(placements_text, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        formatted_cards = self.view_model.get_formatted_placements(placement_history, location_history)
+        formatted_cards = self.view_model.get_formatted_placements(
+            placement_history, location_history
+        )
 
         for placement_str, location_str in formatted_cards:
             card_frame = QFrame()
@@ -172,8 +192,12 @@ class DriverStatsSection(QWidget):
             card_layout = QVBoxLayout(card_frame)
             placement_label = QLabel(placement_str)
             location_label = QLabel(location_str)
-            card_layout.addWidget(placement_label, alignment=Qt.AlignmentFlag.AlignCenter)
-            card_layout.addWidget(location_label, alignment=Qt.AlignmentFlag.AlignCenter)
+            card_layout.addWidget(
+                placement_label, alignment=Qt.AlignmentFlag.AlignCenter
+            )
+            card_layout.addWidget(
+                location_label, alignment=Qt.AlignmentFlag.AlignCenter
+            )
             race_history.addWidget(card_frame)
 
         race_history.addStretch()
@@ -188,7 +212,7 @@ class DriverStatsSection(QWidget):
         self.career_stats_layout = QGridLayout()
         self.career_placeholder = QLabel("No Stats. Select a driver to see stats!")
         self.career_stats_layout.addWidget(self.career_placeholder)
-        
+
         career_stats_widget = QWidget()
         career_stats_widget.setLayout(self.career_stats_layout)
 
@@ -220,12 +244,16 @@ class DriverStatsSection(QWidget):
 
         career_stats_title = QLabel("Career Stats")
 
-        self.career_stats_layout.addWidget(career_stats_title, 0, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.career_stats_layout.addWidget(
+            career_stats_title, 0, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         for row_idx, (title, stats) in enumerate(driver_stats.items(), start=1):
             self._populate_career_stats(self.career_stats_layout, row_idx, title, stats)
 
-    def _populate_career_stats(self, grid: QGridLayout, row: int, label: str, data: typing.Any) -> None:
+    def _populate_career_stats(
+        self, grid: QGridLayout, row: int, label: str, data: typing.Any
+    ) -> None:
         _label = QLabel(label)
         _data = QLabel(data)
 
@@ -237,4 +265,3 @@ class DriverStatsSection(QWidget):
 
         horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
         grid.addWidget(horizontal_line, grid_row + 1, 0, 1, 2)
-                
