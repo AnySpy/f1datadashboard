@@ -2,6 +2,7 @@ import sqlite3
 from Services.database import DB_PATH
 from tests.SignalTesting import redColor, resetColor
 from Services import database
+
 """
     SCHEMA:
     _________________________________________________________________
@@ -30,15 +31,40 @@ from Services import database
 # can't be passed as "?" parameters in SQLite, so they get built into the
 # query string -- this whitelist makes sure only known names ever get there.
 ALLOWED_COLUMNS: dict = {
-    "sessions":    {"session_id", "year", "event_name", "session_type", "total_laps"},
-    "laps":        {"lap_id", "session_id", "driver", "team", "lap_number", "lap_time_seconds",
-                    "compound", "tyre_life", "track_status", "is_pit_lap", "position"},
-    "drivers":     {"session_id", "driver_code", "full_name", "team", "number", "color"},
-    "weather":     {"weather_id", "session_id", "air_temp", "track_temp", "humidity",
-                    "rainfall", "sample_time"},
+    "sessions": {"session_id", "year", "event_name", "session_type", "total_laps"},
+    "laps": {
+        "lap_id",
+        "session_id",
+        "driver",
+        "team",
+        "lap_number",
+        "lap_time_seconds",
+        "compound",
+        "tyre_life",
+        "track_status",
+        "is_pit_lap",
+        "position",
+    },
+    "drivers": {"session_id", "driver_code", "full_name", "team", "number", "color"},
+    "weather": {
+        "weather_id",
+        "session_id",
+        "air_temp",
+        "track_temp",
+        "humidity",
+        "rainfall",
+        "sample_time",
+    },
     "trackStatus": {"entry_id", "session_id", "time", "track_safety_status", "message"},
-    "results":     {"session_id", "driver_code", "grid_position", "finish_position",
-                    "classified_position", "points", "status"},
+    "results": {
+        "session_id",
+        "driver_code",
+        "grid_position",
+        "finish_position",
+        "classified_position",
+        "points",
+        "status",
+    },
 }
 
 # Tables that have a numeric elapsed-time column (seconds) we can search by.
@@ -47,7 +73,12 @@ TIME_COLUMN: dict = {
 }
 
 # What the app should show before the first recorded status change.
-DEFAULT_TRACK_STATUS: dict = {"entry_id": -1, "time": 0.0, "statusCode": 1, "message": "AllClear"}
+DEFAULT_TRACK_STATUS: dict = {
+    "entry_id": -1,
+    "time": 0.0,
+    "statusCode": 1,
+    "message": "AllClear",
+}
 
 
 class DBhandler:
@@ -60,9 +91,20 @@ class DBhandler:
         """closes the database connection"""
         self.conn.close()
 
-    #might be able to estimate this based off of rainfall and driver comms 
+    def getKnownDrivers(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            "SELECT DISTINCT driver_code, full_name FROM drivers WHERE driver_code IS NOT NULL"
+        )
+
+        rows = cursor.fetchall()
+
+        return {code: name for code, name in rows}
+
+    # might be able to estimate this based off of rainfall and driver comms
     def getTrackSurfaceData(self, approxTime: float) -> dict:
-        #search track table
+        # search track table
         trackSurfaceData: dict = {"surfaceTemp": 0, "surfaceStatus": "dry"}
         return trackSurfaceData
 
@@ -95,14 +137,21 @@ class DBhandler:
             (searchIndex,),
         )
         sessionID = cursor.fetchone()
-        if(sessionID is None):
-            print( redColor + "session_id could not be found" + resetColor + "\n")
+        if sessionID is None:
+            print(redColor + "session_id could not be found" + resetColor + "\n")
             return -1
         # fetchone() returns a tuple like (1,) -- return the number inside it
         return sessionID[0]
 
-    def getDataFromTable(self, tableName: str, searchBy: str ,searchData: int | float, attributeNameTuple: tuple, sessionID: int | None = None) -> tuple | None:
-        """ 
+    def getDataFromTable(
+        self,
+        tableName: str,
+        searchBy: str,
+        searchData: int | float,
+        attributeNameTuple: tuple,
+        sessionID: int | None = None,
+    ) -> tuple | None:
+        """
         _summary_: function to get data from database tables
 
         NOTE:
@@ -145,17 +194,21 @@ class DBhandler:
             cursor.execute(dbQuery, (sessionID, float(searchData)))
         else:
             self._checkNames(tableName, (searchBy,))
-            dbQuery = f"SELECT {attributes} FROM {tableName} WHERE {searchBy} = ? LIMIT 1"
-            cursor.execute(dbQuery , (searchData, ))
+            dbQuery = (
+                f"SELECT {attributes} FROM {tableName} WHERE {searchBy} = ? LIMIT 1"
+            )
+            cursor.execute(dbQuery, (searchData,))
 
         results = cursor.fetchone()
-        if(results is None):
+        if results is None:
             print(f"No data found at {searchData}")
             return None
-        #return data from dbQuery to the function that needs it
+        # return data from dbQuery to the function that needs it
         return results
 
-    def _getNextStatusChange(self, sessionID: int, entryID: int, time: float) -> float | None:
+    def _getNextStatusChange(
+        self, sessionID: int, entryID: int, time: float
+    ) -> float | None:
         """
         _summary_: finds when the NEXT track status change happens in this session
 
@@ -177,9 +230,15 @@ class DBhandler:
         nextRow = cursor.fetchone()
         return None if nextRow is None else nextRow[0]
 
-    def getTrackSafetyStatus(self, approxTime: float = 0.00, currentSessionID: int = 1, currentIndex: int = -1, endFlag: bool = False) -> dict:
+    def getTrackSafetyStatus(
+        self,
+        approxTime: float = 0.00,
+        currentSessionID: int = 1,
+        currentIndex: int = -1,
+        endFlag: bool = False,
+    ) -> dict:
         """
-        _summary_: get track data from db and return it to the track status view model 
+        _summary_: get track data from db and return it to the track status view model
 
         Args:
             approxTime (float): the approximate time (seconds into the session) of the data for which you are looking
@@ -195,14 +254,29 @@ class DBhandler:
         """
         columns = ("entry_id", "session_id", "time", "track_safety_status", "message")
         trackTableData: tuple | None
-        if(currentIndex == -1):
+        if currentIndex == -1:
             # pull data via approxTime (nearest entry at or before it)
-            trackTableData = self.getDataFromTable(tableName= "trackStatus", searchBy= "time", searchData= approxTime, attributeNameTuple= columns, sessionID= currentSessionID)
+            trackTableData = self.getDataFromTable(
+                tableName="trackStatus",
+                searchBy="time",
+                searchData=approxTime,
+                attributeNameTuple=columns,
+                sessionID=currentSessionID,
+            )
         else:
             # pull data via entry_id
-            trackTableData = self.getDataFromTable(tableName= "trackStatus", searchBy= "entry_id", searchData= currentIndex, attributeNameTuple= columns)
+            trackTableData = self.getDataFromTable(
+                tableName="trackStatus",
+                searchBy="entry_id",
+                searchData=currentIndex,
+                attributeNameTuple=columns,
+            )
             if trackTableData is not None and trackTableData[1] != currentSessionID:
-                print(redColor + f"entry {currentIndex} belongs to session {trackTableData[1]}, not {currentSessionID}" + resetColor)
+                print(
+                    redColor
+                    + f"entry {currentIndex} belongs to session {trackTableData[1]}, not {currentSessionID}"
+                    + resetColor
+                )
                 trackTableData = None
 
         if trackTableData is None:
@@ -227,7 +301,6 @@ class DBhandler:
         }
         return trackStatusData
 
-    
     """
                                 driver table
     ______________________________________________________________________
@@ -237,6 +310,7 @@ class DBhandler:
     ______________________________________________________________________
 
     """
+
     def getDriverSpeed(self, approxTime: float, driverCode: str = "") -> float:
         # stub -- needs a telemetry (speed) table first; takes a driverCode
         # because speed is different for every driver
@@ -245,6 +319,7 @@ class DBhandler:
 
 def main():
     return 0
+
 
 if __name__ == "__main__":
     main()
