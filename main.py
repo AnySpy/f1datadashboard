@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
         self.dbHandler = DBhandler()
-        self.driverProfilesVM = DriverProfilesViewModel()
+        self.driverProfilesVM = DriverProfilesViewModel(self.dbHandler)
         self.trackStatusVM = TrackStatusVM(self.dbHandler)
         # set the main container
         mainContainer = QWidget()

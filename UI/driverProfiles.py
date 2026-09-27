@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy, QScrollArea, QGridLayout
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QPainter, QPainterPath
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
 import typing
 
@@ -12,16 +12,27 @@ class DriverProfiles(QWidget):
     def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
         self.view_model = view_model
+        self.driver_codes = self.view_model.get_driver_codes()
 
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(0)
 
-        self.nav_bar = DriverNavBar()
+        self.nav_bar = DriverNavBar(self.driver_codes)
+
+        self.nav_bar.driver_selected.connect(self.view_model.select_driver)
+
         grid.addWidget(self.nav_bar, 0, 0, 1, 2)
 
-        self.driver_about_section = DriverAboutSection()
+        self.driver_about_section = DriverAboutSection(self.view_model)
+
+        self.view_model.bio_loaded.connect(self.driver_about_section.update_bio)
+        self.view_model.name_loaded.connect(self.driver_about_section.update_name)
+        self.view_model.img_loaded.connect(self.driver_about_section.update_img)
+
         grid.addWidget(self.driver_about_section, 1, 0)
+        
+        # TODO: We lost a vertical line here :(
 
         self.driver_stats_section = DriverStatsSection(self.view_model)
         grid.addWidget(self.driver_stats_section, 1, 1)
@@ -31,11 +42,12 @@ class DriverProfiles(QWidget):
 
 # Top nav bar. This should probably be a search bar in hindsight, but I like the design of this right now so we're going with it.
 class DriverNavBar(QWidget):
-    def __init__(self):
+    driver_selected = Signal(str)
+
+    def __init__(self, driver_codes: list[str]):
         super().__init__()
 
-        # TODO: We should automatically pull all of this from the database before looping through it eventually.
-        drivers = ["ME", "VER", "HAM", "RUS", "NOR", "LAW", "LEC"]
+        drivers = driver_codes
 
         layout = QVBoxLayout(self)
         driver_container = QHBoxLayout()
@@ -51,63 +63,63 @@ class DriverNavBar(QWidget):
 
         for driver in drivers:
             driver_button = QPushButton(driver)
+
+            driver_button.clicked.connect(lambda checked=False, code=driver: self._on_driver_button_clicked(code))
+
             driver_container.addWidget(driver_button)
 
         driver_container.setContentsMargins(0, 0, 0, 0)
         driver_container.setSpacing(10)
 
-        layout.addLayout(driver_container)
+        driver_container_widget = QWidget()
+        driver_container_widget.setLayout(driver_container)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(driver_container_widget)
+
+        layout.addWidget(scroll_area)
         layout.addWidget(horizontal_line)
 
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
+    def _on_driver_button_clicked(self, code):
+        self.driver_selected.emit(code)
+
 # Left side, contains a picture, the name of the driver, and their biography
 class DriverAboutSection(QWidget):
-    def __init__(self):
+    driver_bio = Signal(str)
+    driver_name = Signal(str)
+    driver_img = Signal(str)
+
+    def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
+        self.view_model = view_model
 
         layout = QVBoxLayout(self)
         basic_info = QVBoxLayout()
         bio = QVBoxLayout()
 
-        # TODO: All of this is a placeholder and needs to be pulled from somewhere instead of being hardcoded.
-
-        # ? The idea is that we scale the image down to 100x100, create a canvas object of the same size, 
-        # ?     create a painter object with a circular path that then paints the image as a circle onto the canvas,
-        # ?     and then creates a label holder for that image to display the canvas in the UI.
-        # ? It's kind of disgusting and I hate it but I couldn't figure out how to do it in QSS. If we could figure that out, it'd be much better.
-        image = QPixmap("images/sample_driver.jpg")
-        image = image.scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-        canvas = QPixmap(100, 100)
-        canvas.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(canvas)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter_path = QPainterPath()
-        painter_path.addEllipse(0, 0, 100, 100)
-        painter.setClipPath(painter_path)
-        painter.drawPixmap(0, 0, image)
-        painter.end()
-
-        image_holder = QLabel()
-        image_holder.setPixmap(canvas)
-        image_holder.setFixedSize(100, 100)
+        self.image_holder = QLabel()
+        self.image_holder.setPixmap(QPixmap("images/sample_driver.jpg"))
+        self.image_holder.setFixedSize(100, 100)
         
-        name = QLabel("NAME")
+        self.name = QLabel("NAME")
         horizontal_line = QFrame(frameShape=QFrame.Shape.HLine)
         about = QLabel("ABOUT")
 
-        about_text = QLabel("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
-        about_text.setWordWrap(True)
-        about_text.setAlignment(Qt.AlignmentFlag.AlignJustify)
+        self.about_text = QLabel("Click on a driver to view their biography.")
+        self.about_text.setWordWrap(True)
+        self.about_text.setAlignment(Qt.AlignmentFlag.AlignJustify)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(about_text)
+        scroll_area.setWidget(self.about_text)
 
-        basic_info.addWidget(image_holder, alignment=Qt.AlignmentFlag.AlignHCenter)
-        basic_info.addWidget(name, alignment=Qt.AlignmentFlag.AlignHCenter)
+        basic_info.addWidget(self.image_holder, alignment=Qt.AlignmentFlag.AlignHCenter)
+        basic_info.addWidget(self.name, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         bio.addWidget(about, alignment=Qt.AlignmentFlag.AlignHCenter)
         bio.addWidget(scroll_area)
@@ -125,14 +137,20 @@ class DriverAboutSection(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addStretch()
 
+    def update_bio(self, bio_text: str) -> None:
+        self.about_text.setText(bio_text)
+
+    def update_name(self, driver_name: str) -> None:
+        self.name.setText(driver_name)
+
+    def update_img(self, pixmap: QPixmap) -> None:
+        self.image_holder.setPixmap(pixmap)
+
 # Right side, contains their placement history and their career stats
 class DriverStatsSection(QWidget):
     def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
         self.view_model = view_model
-
-        # TODO: Replace with a name argument later
-        driver_stats = self.view_model.get_career_stats("max-verstappen")
 
         # TODO: Pull this from Viewmodel later
         placement_history = [8, 1, 2, 1, 4]
@@ -167,17 +185,12 @@ class DriverStatsSection(QWidget):
         scroll_area.setWidget(race_widget)
         scroll_area.setFixedHeight(110)
 
-
-        career_stats_layout = QGridLayout()
-        career_stats_title = QLabel("Career Stats")
-
-        career_stats_layout.addWidget(career_stats_title, 0, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        for row_idx, (title, stat) in enumerate(driver_stats.items(), start=1):
-            self._populate_career_stats(career_stats_layout, row_idx, title, stat)
-
+        self.career_stats_layout = QGridLayout()
+        self.career_placeholder = QLabel("No Stats. Select a driver to see stats!")
+        self.career_stats_layout.addWidget(self.career_placeholder)
+        
         career_stats_widget = QWidget()
-        career_stats_widget.setLayout(career_stats_layout)
+        career_stats_widget.setLayout(self.career_stats_layout)
 
         career_stats_scroll = QScrollArea()
         career_stats_scroll.setWidgetResizable(True)
@@ -191,6 +204,26 @@ class DriverStatsSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.view_model.stats_loaded.connect(self.update_stats)
+
+    def update_stats(self, driver_stats: dict[str, str]) -> None:
+        while self.career_stats_layout.count():
+            item = self.career_stats_layout.takeAt(0)
+
+            # ? PyLance was being an ass about "None" not having .deleteLater() despite a very elegant assert statement (assert item is not None)
+            # ?     so now we have to deal with this and it's ugly and I hate it with all my heart <3
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+
+        career_stats_title = QLabel("Career Stats")
+
+        self.career_stats_layout.addWidget(career_stats_title, 0, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        for row_idx, (title, stats) in enumerate(driver_stats.items(), start=1):
+            self._populate_career_stats(self.career_stats_layout, row_idx, title, stats)
 
     def _populate_career_stats(self, grid: QGridLayout, row: int, label: str, data: typing.Any) -> None:
         _label = QLabel(label)

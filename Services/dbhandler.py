@@ -58,6 +58,17 @@ class DBhandler:
         """closes the database connection"""
         self.conn.close()
 
+    def getKnownDrivers(self):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            f"SELECT DISTINCT driver_code, full_name FROM drivers WHERE driver_code IS NOT NULL"
+        )
+
+        rows = cursor.fetchall()
+
+        return {code: name for code, name in rows}
+
     #might be able to estimate this based off of rainfall and driver comms 
     def getTrackSurfaceData(self, approxTime: float) -> dict:
         #search track table
