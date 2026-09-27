@@ -1,6 +1,8 @@
-greenColor = '\033[92m'
-resetColor = '\033[0m'
-redColor = '\033[91m'
+greenColor = "\033[92m"
+resetColor = "\033[0m"
+redColor = "\033[91m"
+
+
 class testTrackStatusSignal:
     """
 
@@ -13,24 +15,26 @@ class testTrackStatusSignal:
         3. insure correct value is coming from database
 
     """
+
     def __init__(self):
         self.numTestsPassed: int = 0
         self.totalNumTests: int = 3
 
     def testSignalChanges():
         works: bool = False
-        #stub
+        # stub
         return works
+
     def testCorrectVal():
         works: bool = False
-        #stub
+        # stub
         return works
+
     def testSignalHandler():
         works: bool = False
-        #stub
+        # stub
         return works
-    
+
 
 if __name__ == "main":
     print(testTrackStatusSignal())
-

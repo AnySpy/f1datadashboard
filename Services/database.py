@@ -149,12 +149,12 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     session.load()
 
     laps = session.laps.copy()
-    weather = session.weather_data.copy() 
+    weather = session.weather_data.copy()
     results = session.results.copy()  # has driver code, name, team, number, color
     total_laps = int(laps["LapNumber"].max())
     year = session.date.year
     event = session.event.EventName
-    #copy data from session.track_status
+    # copy data from session.track_status
     trackStatusDF = session.track_status.copy()
     # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
     # - yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
@@ -255,9 +255,8 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
             """ 
             INSERT INTO trackStatus (session_id, time, track_safety_status, message)
             VALUES(?, ?, ?, ?)
-            """, 
+            """,
             (session_id, timeStampInSeconds, statusNumCode, message),
-
         )
     conn.commit()
     conn.close()
@@ -286,6 +285,7 @@ def _preview_db(db_path: str = DB_PATH):
     print("\n --- Sample trackStatus ---")
     print(pd.read_sql("SELECT * FROM trackStatus LIMIT 5", conn))
     conn.close()
+
 
 def _main():
     create_schema()
