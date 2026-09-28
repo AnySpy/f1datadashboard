@@ -111,9 +111,15 @@ def train_model(df: pd.DataFrame):
         tuple: (best_model_pipeline, mae_of_best_model)
     """
     feature_cols = [
-        "tyre_life", "compound", "laps_remaining",
-        "avg_air_temp", "avg_track_temp", "avg_humidity", "any_rainfall",
-        "driver", "team",
+        "tyre_life",
+        "compound",
+        "laps_remaining",
+        "avg_air_temp",
+        "avg_track_temp",
+        "avg_humidity",
+        "any_rainfall",
+        "driver",
+        "team",
     ]
     target_col = "lap_time_seconds"
 
@@ -135,12 +141,17 @@ def train_model(df: pd.DataFrame):
     linear_mae = mean_absolute_error(y_test, linear_pipeline.predict(X_test))
     print(f"Linear Regression MAE: {linear_mae:.3f} seconds")
 
-    gb_pipeline = Pipeline([
-        ("prep", preprocessor),
-        ("model", GradientBoostingRegressor(
-            n_estimators=200, max_depth=4, learning_rate=0.05, random_state=42
-        )),
-    ])
+    gb_pipeline = Pipeline(
+        [
+            ("prep", preprocessor),
+            (
+                "model",
+                GradientBoostingRegressor(
+                    n_estimators=200, max_depth=4, learning_rate=0.05, random_state=42
+                ),
+            ),
+        ]
+    )
     gb_pipeline.fit(X_train, y_train)
     gb_mae = mean_absolute_error(y_test, gb_pipeline.predict(X_test))
     print(f"Gradient Boosting MAE: {gb_mae:.3f} seconds")

@@ -9,7 +9,7 @@ class Vehicle:
         fuel_level: float = 110.00,
         throttle: float = -1.00,
         brake: float = -1.00,
-        gear: int = -1
+        gear: int = -1,
     ):
         """Constructor for the vehicle class
 

@@ -7,10 +7,6 @@
 # data from the fastf1 API into it, so you can show a working example.
 # ==========================================================================
 
-# ! Problems:
-# !     Calls to the database needs to have a unique key to make sure the event is available during a quick lookup.
-# !             We could pass the entire EventSchedule to a frontend helper function to not mangle the data while still presenting the EventName to the user?
-# !     We need a way to mark whether an event is a future event and we need to update those events with final standings when they hit the API.
 
 # %% [1] IMPORTS ------------------------------------------------------------
 import sqlite3
@@ -27,8 +23,21 @@ fastf1.Cache.enable_cache("f1_cache")
 DB_PATH = "f1_data.db"
 
 
+def _to_int(value):
+    """NaN / None -> None, otherwise a plain int (sqlite can't store numpy ints)"""
+    return None if pd.isna(value) else int(value)
+
+
+def _to_float(value):
+    return None if pd.isna(value) else float(value)
+
+
+def _to_text(value):
+    """NaN / None / "" -> None, otherwise a string"""
+    return None if pd.isna(value) or str(value).strip() == "" else str(value)
+
+
 # %% [2] CREATE THE DATABASE SCHEMA ------------------------------------------
-# ! This MUST be run at startup. We need somewhere to call this that only runs on init of the app/loss of viable database.
 def create_schema(db_path: str = DB_PATH) -> None:
     """Defines the database
 
@@ -78,6 +87,7 @@ def create_schema(db_path: str = DB_PATH) -> None:
         tyre_life INTEGER,
         track_status TEXT,
         is_pit_lap INTEGER,
+        position INTEGER,
         FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
     """)
@@ -149,6 +159,33 @@ def create_schema(db_path: str = DB_PATH) -> None:
         FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
     """)
+
+    # Results table — the official race result, one row per driver per session.
+    # Feeds the "placement over time" graph (#44) and race outcome prediction (#42).
+    # grid_position 0 = started from the pit lane.
+    # finish_position = where they crossed the line (every driver gets one);
+    # classified_position = the official result: a number, or "R" retired,
+    # "D" disqualified, etc. status = "Finished", "Lapped", "Retired", ...
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS results (
+        session_id INTEGER NOT NULL,
+        driver_code TEXT NOT NULL,
+        grid_position INTEGER,
+        finish_position INTEGER,
+        classified_position TEXT,
+        points REAL,
+        status TEXT,
+        PRIMARY KEY (session_id, driver_code),
+        FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+    """)
+
+    # Databases made before this change have a laps table without the
+    # position column — add it so old f1_data.db files keep working.
+    lap_columns = [row[1] for row in cur.execute("PRAGMA table_info(laps)")]
+    if "position" not in lap_columns:
+        cur.execute("ALTER TABLE laps ADD COLUMN position INTEGER")
+
     conn.commit()
     conn.close()
     print(f"Schema created at {db_path}")
@@ -169,12 +206,12 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     session.load()
 
     laps = session.laps.copy()
-    weather = session.weather_data.copy() 
+    weather = session.weather_data.copy()
     results = session.results.copy()  # has driver code, name, team, number, color
     total_laps = int(laps["LapNumber"].max())
     year = session.date.year
     event = session.event.EventName
-    #copy data from session.track_status
+    # copy data from session.track_status
     trackStatusDF = session.track_status.copy()
     # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
     # - yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
@@ -199,6 +236,12 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     )
     session_id = cur.fetchone()[0]
 
+    # Reloading a race used to insert its laps/weather/trackStatus rows a
+    # second time (those tables have no unique key). Clear this session's old
+    # rows first so a reload replaces the data instead of duplicating it.
+    for table in ("laps", "weather", "trackStatus", "results"):
+        cur.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
+
     # Insert drivers
     for _, row in results.iterrows():
         cur.execute(
@@ -217,6 +260,25 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
         )
     conn.commit()
 
+    # Insert results
+    for _, row in results.iterrows():
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO results (session_id, driver_code, grid_position,
+                finish_position, classified_position, points, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                session_id,
+                row.get("Abbreviation"),
+                _to_int(row.get("GridPosition")),
+                _to_int(row.get("Position")),
+                _to_text(row.get("ClassifiedPosition")),
+                _to_float(row.get("Points")),
+                _to_text(row.get("Status")),
+            ),
+        )
+
     # Insert laps
     for _, row in laps.iterrows():
         lap_time = row["LapTime"].total_seconds() if pd.notna(row["LapTime"]) else None
@@ -228,8 +290,8 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
         cur.execute(
             """
             INSERT INTO laps (session_id, driver, team, lap_number, lap_time_seconds,
-                               compound, tyre_life, track_status, is_pit_lap)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               compound, tyre_life, track_status, is_pit_lap, position)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 session_id,
@@ -241,6 +303,7 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
                 row.get("TyreLife"),
                 str(row.get("TrackStatus")),
                 is_pit,
+                _to_int(row.get("Position")),  # race position at the end of this lap
             ),
         )
 
@@ -275,9 +338,8 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
             """ 
             INSERT INTO trackStatus (session_id, time, track_safety_status, message)
             VALUES(?, ?, ?, ?)
-            """, 
+            """,
             (session_id, timeStampInSeconds, statusNumCode, message),
-
         )
     conn.commit()
     conn.close()
@@ -303,9 +365,14 @@ def _preview_db(db_path: str = DB_PATH):
     print(pd.read_sql("SELECT * FROM laps LIMIT 5", conn))
     print("\n--- Sample weather ---")
     print(pd.read_sql("SELECT * FROM weather LIMIT 5", conn))
+    print("\n--- Results ---")
+    print(
+        pd.read_sql("SELECT * FROM results ORDER BY session_id, finish_position", conn)
+    )
     print("\n --- Sample trackStatus ---")
     print(pd.read_sql("SELECT * FROM trackStatus LIMIT 5", conn))
     conn.close()
+
 
 def _main():
     create_schema()

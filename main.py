@@ -1,14 +1,20 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame
-from PySide6.QtGui import *
+from PySide6.QtGui import QPalette, Qt
 
 from UI.home import HomePage
 from UI.dataAnalysisPage import DataAnalysisPage
 from UI.driverProfiles import DriverProfiles
 
-#import dbhandler
+# Import VMs
+from ViewModels.driverProfilesVM import DriverProfilesViewModel
+from ViewModels.playControlsVM import PlayControlsViewModel
+from ViewModels.raceSimulationVM import TrackStatusVM
+
+# import dbhandler
 from Services.dbhandler import DBhandler
+
 """
 Global Vars
 """
@@ -25,6 +31,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
         self.dbHandler = DBhandler()
+        self.driverProfilesVM = DriverProfilesViewModel(self.dbHandler)
+        self.trackStatusVM = TrackStatusVM(self.dbHandler)
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
@@ -32,7 +40,7 @@ class MainWindow(QMainWindow):
         # initialize all view models
         #
         # create initialize track status view model
-        #self.monitorTrackStatus = TrackStatusVM()
+        # self.monitorTrackStatus = TrackStatusVM()
 
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
@@ -41,13 +49,12 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
 
         # create the main elements and pass down the switch page function
-        self.sidebar = Sidebar(
-            self.switch_page
-        )  
+        self.sidebar = Sidebar(self.switch_page)
         # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage(self.dbHandler)
-        self.settings = DataAnalysisPage(self.dbHandler)
-        self.driverProfiles = DriverProfiles(self.dbHandler)
+        self.home = HomePage(self.trackStatusVM)
+        self.settings = DataAnalysisPage()
+        # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here,
+        self.driverProfiles = DriverProfiles(self.driverProfilesVM)
 
         # add the pages to the stack
         self.stack.addWidget(self.home)
@@ -82,29 +89,29 @@ class Sidebar(QFrame):
         # self.setMaximumWidth(150)
         # self.setMinimumWidth(40)
         self.setAutoFillBackground(True)
-        self.setBackgroundRole(QPalette.Base)
+        self.setBackgroundRole(QPalette.ColorRole.Base)
         self.setStyleSheet(
             f"""
                 background-color: {backgroundColor};
                 border-radius: 12px;        
-            """)
+            """
+        )
 
-        
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         changePageBtn = QPushButton("Home")
         # removes window auto focussing to this button on launch
-        changePageBtn.setFocusPolicy(Qt.NoFocus)
+        changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(0))
         layout.addWidget(changePageBtn)
 
         changePageBtn = QPushButton("Data Analysis")
-        changePageBtn.setFocusPolicy(Qt.NoFocus)
+        changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(1))
         layout.addWidget(changePageBtn)
 
         changePageBtn = QPushButton("Driver Profiles")
-        changePageBtn.setFocusPolicy(Qt.NoFocus)
+        changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(2))
         layout.addWidget(changePageBtn)
 
@@ -115,13 +122,14 @@ class Sidebar(QFrame):
     def updateHightlight(self):
         print("update button highlight")
 
+
 def _main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.resize(700, 300)
     window.show()
     sys.exit(app.exec())
-       
+
 
 if __name__ == "__main__":
     _main()
