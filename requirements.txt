@@ -46,3 +46,4 @@ beautifulsoup4==4.15.0
 scikit-learn==1.9.1
 joblib==1.6.0
 beautifulsoup4==4.15.0
+requests-ratelimiter==0.10.0
