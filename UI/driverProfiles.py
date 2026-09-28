@@ -21,6 +21,11 @@ import typing
 
 class DriverProfiles(QWidget):
     def __init__(self, view_model: DriverProfilesViewModel):
+        """Generic initialization of the `DriverProfiles` class
+
+        Args:
+            view_model (DriverProfilesViewModel): A `DriverProfilesViewModel` object that the UI will connect to.
+        """
         super().__init__()
         self.view_model = view_model
         self.driver_codes = self.view_model.get_driver_codes()

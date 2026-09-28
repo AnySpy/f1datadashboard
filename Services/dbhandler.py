@@ -91,7 +91,12 @@ class DBhandler:
         """closes the database connection"""
         self.conn.close()
 
-    def getKnownDrivers(self):
+    def getKnownDrivers(self) -> dict[str, str]:
+        """Returns a list of every driver that has been recorded in the database
+
+        Returns:
+            dict[str, str]: A dictionary containing the driver code (e.g. VER) as the key and the driver's full name (e.g. Max Verstappen) as the value.
+        """
         cursor = self.conn.cursor()
 
         cursor.execute(

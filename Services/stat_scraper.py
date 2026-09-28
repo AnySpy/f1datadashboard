@@ -6,6 +6,8 @@ import typing
 
 class DriverStatScraper:
     def __init__(self):
+        """Generic initialization for the stat scraper. Instantiates a rate-limited session and sets the headers of that session.
+        """
         self.session = LimiterSession(per_second=2, per_minute=60)
         self.session.headers.update(
             {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -40,6 +42,15 @@ class DriverStatScraper:
         return driver_stats
 
     def _fetch_driver_image_url(self, soup: BeautifulSoup) -> str | None:
+        """Gets the driver's image URL from the f1 website
+
+        Args:
+            soup (BeautifulSoup): A `BeautifulSoup` object that contains the request text and is using the html parser.
+
+        Returns:
+            str | None: The URL as a string or `None` if there is no valid URL.
+        """
+        # ? This uses the fact that there's only one image that contains `media.formula1.com` on the website to grab the driver's image
         img_tag = soup.find("img", src=compile(r"media\.formula1\.com"))
 
         if img_tag and img_tag.get("src"):
@@ -50,6 +61,14 @@ class DriverStatScraper:
         return None
 
     def fetch_driver_image(self, driver_name: str) -> bytes | None:
+        """Gets the bytestream of the driver's image from the f1 website
+
+        Args:
+            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+
+        Returns:
+            bytes | None: The bytestream of the image or `None` if there is no valid image found.
+        """
         r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
         if r.status_code != 200:
             return None
@@ -66,6 +85,14 @@ class DriverStatScraper:
         return None
 
     def _parse_container_stats(self, container: Tag | None) -> dict[str, str]:
+        """Helper function for `fetch_driver_stats()`. Creates the internal dictionaries of the nested dict structure.
+
+        Args:
+            container (Tag | None): A collection of Tags found by the `soup.find()` method.
+
+        Returns:
+            dict[str, str]: A dictionary containing the title of the stat as the key and the value of the stat as the value.
+        """
         if container is None:
             return {}
 
@@ -90,6 +117,14 @@ class DriverStatScraper:
         return data
 
     def fetch_driver_bio(self, driver_name: str) -> str:
+        """Returns the driver's biography from the F1 website
+
+        Args:
+            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+
+        Returns:
+            str: The biography of the driver as a string.
+        """
         # ? Trying something new with scraping stats. We'll see if this is less fragile.
         r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
 
