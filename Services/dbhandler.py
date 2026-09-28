@@ -43,6 +43,7 @@ ALLOWED_COLUMNS: dict = {
         "tyre_life",
         "track_status",
         "is_pit_lap",
+        "position",
     },
     "drivers": {"session_id", "driver_code", "full_name", "team", "number", "color"},
     "weather": {
@@ -55,6 +56,15 @@ ALLOWED_COLUMNS: dict = {
         "sample_time",
     },
     "trackStatus": {"entry_id", "session_id", "time", "track_safety_status", "message"},
+    "results": {
+        "session_id",
+        "driver_code",
+        "grid_position",
+        "finish_position",
+        "classified_position",
+        "points",
+        "status",
+    },
 }
 
 # Tables that have a numeric elapsed-time column (seconds) we can search by.
