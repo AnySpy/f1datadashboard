@@ -26,6 +26,11 @@ class DriverProfilesViewModel(QObject):
     img_loaded = Signal(QPixmap)
 
     def __init__(self, dbhandler: DBhandler):
+        """Generic initialization of the `DriverProfilesViewModel` class
+
+        Args:
+            dbhandler (DBhandler): A `DBhandler` object that will be used to communicate with the database. Should be passed from `main.py`
+        """
         super().__init__()
 
         self.dbhandler = dbhandler
@@ -74,13 +79,21 @@ class DriverProfilesViewModel(QObject):
         return self.scraper.fetch_driver_bio(driver_name)
 
     def get_driver_image(self, driver_name: str) -> QPixmap:
+        """Returns the driver image formatted to be the profile image for the driver profile.
+
+        Args:
+            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+
+        Returns:
+            QPixmap: A canvas object that is ready to be displayed to the user.
+        """
         img_bytes = self.scraper.fetch_driver_image(driver_name)
         pixmap = QPixmap()
 
         if img_bytes and pixmap.loadFromData(QByteArray(img_bytes)):
             pass
         else:
-            # TODO: This should be replaced with a generic "Driver Not Found eventually"
+            # TODO: This should be replaced with a generic "Driver Not Found" eventually
             pixmap = QPixmap("images/sample_driver.jpg")
 
         # ? The idea is that we scale the image down to 100x100, create a canvas object of the same size,
@@ -156,13 +169,34 @@ class DriverProfilesViewModel(QObject):
 
         return self.current_stats
 
-    def get_season_stats(self, driver_name: str):
+    def get_season_stats(self, driver_name: str) -> dict[str, str]:
+        """Returns the given driver's season stats
+
+        Args:
+            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+
+        Returns:
+            dict[str, str]: A dictionary containing the key of the title of the stat and the value of the value of said stat.
+        """
         return self._load_driver_stats(driver_name, "season")
 
     def get_career_stats(self, driver_name: str):
+        """Returns the given driver's career stats
+
+        Args:
+            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+
+        Returns:
+            dict[str, str]: A dictionary containing the key of the title of the stat and the value of the value of said stat.
+        """
         return self._load_driver_stats(driver_name, "career")
 
     def select_driver(self, driver_code: str):
+        """Binds to the signal objects from the driverProfiles to update the display
+
+        Args:
+            driver_code (str): The code of the driver (e.g. Max Verstappen would be `VER`)
+        """
         driver_dict = self._get_known_drivers()
 
         driver_name = driver_dict[driver_code]
