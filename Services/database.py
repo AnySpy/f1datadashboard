@@ -47,6 +47,20 @@ def create_schema(db_path: str = DB_PATH) -> None:
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
+    """
+        SCHEMA:
+        _____________________________________________________________________________________
+        |                                   sessions                                        |
+        _____________________________________________________________________________________
+        |session_id| year |    event_name    |    session_type   | total_laps|  total_time  |
+        _____________________________________________________________________________________
+        |   1      | 2026 | japan grand prix |                   |     57    |  10000.52    | example data
+        _____________________________________________________________________________________
+    
+        NOTE: 
+            - need to determine how to store total_time (is text better in this instance then convert in the playcontrols vm)
+            - total_time won't be loaded on db creation it will be loaded on playControls.__init__() so make it 0.00 on load
+    """
     # Sessions table — one row per race/session loaded
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sessions (
@@ -55,6 +69,7 @@ def create_schema(db_path: str = DB_PATH) -> None:
         event_name TEXT NOT NULL,
         session_type TEXT NOT NULL,
         total_laps INTEGER,
+        total_time FLOAT NOT NULL,
         UNIQUE(year, event_name, session_type)
     )
     """)
@@ -205,10 +220,10 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     # Insert into sessions table (or get existing session_id if already loaded)
     cur.execute(
         """
-        INSERT OR IGNORE INTO sessions (year, event_name, session_type, total_laps)
-        VALUES (?, ?, ?, ?)
+        INSERT OR IGNORE INTO sessions (year, event_name, session_type, total_laps, total_time)
+        VALUES (?, ?, ?, ?, ?)
     """,
-        (year, event, session_type, total_laps),
+        (year, event, session_type, total_laps, 0.00),
     )
     conn.commit()
 
