@@ -131,6 +131,53 @@ class DriverStandingsVM(QObject):
         #updated list of Dictionaries
         return 0 
 
+class PlayControlsVM(QObject):
+    """_summary_
+
+    Args:
+        QObject (_type_): _description_
+    Methods:
+        Skip forward and back
+        Play/ Pause
+        update Track status marks on playcontrols
+
+    Notes:
+        - The seconds will need to interact with the player standings so that 
+          we don't have to constantly send updates from the View Model
+        - This will also need to interact with race simulation
+        WHAT THIS NEEDS TO WORK 
+        - needs to have the total session time for each selected session
+        - needs to be able to show current time and total time on front end
+        - needs to be able to change current time
+        - needs to be able to play / pause simulation
+    """
+    updatedTime = Signal(float)
+    raceDuration = Signal(float)
+    # used to display time on play back slider
+    updatedFormattedTime = Signal(str)
+    def __init__(self):
+        super().__init__()
+        self.isPlaying: bool = False
+        self.currentTime:float = 0.00
+
+    def togglePlay(self):
+        #stub
+        return 0 
+    def setCurrentTime(self):
+        # make what ever is reading the data convert the convert the time to a string and update the updatedTime hour: minute: second
+        return 0
+    def setRaceDuration(self):
+        """
+        query lap 1 
+        """
+        print("setting race duration")
+
+    def seek(self):
+        #stub
+        return 0
+    
+    
+
 
 class RaceHandler(QObject):
     """

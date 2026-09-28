@@ -29,7 +29,7 @@ from Services import database
 class DBhandler:
     def __init__(self):
         print("loading...")
-        database._main()
+        #database._main()
         self.conn = sqlite3.connect(DB_PATH)
         #might be able to estimate this based off of rainfall and driver comms 
     def getTrackSurfaceData(self, approxTime: float) -> dict:
@@ -37,6 +37,7 @@ class DBhandler:
         trackSurfaceData: dict = {"surfaceTemp": 0, "surfaceStatus": "dry"}
         return trackSurfaceData
 
+    # need to depreciate this function next
     def getSessionID(self, tableName: str, searchIndex: int):
         cursor = self.conn.cursor()
         cursor.execute
