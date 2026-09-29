@@ -13,7 +13,6 @@ import sqlite3
 import fastf1
 import pandas as pd
 import os
-
 from fastf1.events import Session
 
 os.makedirs("f1_cache", exist_ok=True)
@@ -22,6 +21,7 @@ fastf1.Cache.enable_cache("f1_cache")
 # TODO: Find a permanent location to store the database on the local machine
 DB_PATH = "f1_data.db"
 
+# TODO: rework the dbHandler function
 
 def _to_int(value):
     """NaN / None -> None, otherwise a plain int (sqlite can't store numpy ints)"""
@@ -36,6 +36,26 @@ def _to_text(value):
     """NaN / None / "" -> None, otherwise a string"""
     return None if pd.isna(value) or str(value).strip() == "" else str(value)
 
+def calculateTotalSessionTime(session: Session) -> float:
+        """ Time | pd.Timedelta | The drivers total race time 
+        (values only given if session is ‘Race’, ‘Sprint’, ‘Sprint Shootout’ or 
+        ‘Sprint Qualifying’ >and the driver was not more than one lap behind 
+        the leader
+
+        Args:
+            session_id (int): _description_
+
+        Returns:
+            float: _description_
+        """
+        # can I just pass the memory location so I don't have to load it again
+        # this makes a new DF
+        newSessionStatus = session.session_status
+        startFlag = newSessionStatus.loc[newSessionStatus["Status"] == "Started", "Time"].iloc[0]
+        endFlag = newSessionStatus.loc[newSessionStatus["Status"] == "Finished", "Time"].iloc[-1]
+        raceDuration = (endFlag - startFlag).total_seconds()
+        print(f"{session.name} total session time = {raceDuration}")
+        return(raceDuration)
 
 # %% [2] CREATE THE DATABASE SCHEMA ------------------------------------------
 def create_schema(db_path: str = DB_PATH) -> None:
@@ -216,14 +236,14 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
     # - yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
     session_type = session.event.Session5
-
+    session_time = calculateTotalSessionTime(session)
     # Insert into sessions table (or get existing session_id if already loaded)
     cur.execute(
         """
         INSERT OR IGNORE INTO sessions (year, event_name, session_type, total_laps, total_time)
         VALUES (?, ?, ?, ?, ?)
     """,
-        (year, event, session_type, total_laps, 0.00),
+        (year, event, session_type, total_laps, session_time),
     )
     conn.commit()
 

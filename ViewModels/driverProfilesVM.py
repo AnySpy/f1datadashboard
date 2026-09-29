@@ -25,7 +25,7 @@ class DriverProfilesViewModel(QObject):
     name_loaded = Signal(str)
     img_loaded = Signal(QPixmap)
 
-    def __init__(self, dbhandler: DBhandler):
+    def __init__(self):
         """Generic initialization of the `DriverProfilesViewModel` class
 
         Args:
@@ -33,7 +33,7 @@ class DriverProfilesViewModel(QObject):
         """
         super().__init__()
 
-        self.dbhandler = dbhandler
+        self.dbhandler = DBhandler()
 
         self.scraper = DriverStatScraper()
         # ? Initializing this here in case we need to remember this data between state changes. It'd be easy to remove this later if we want to.
