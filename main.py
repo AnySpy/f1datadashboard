@@ -34,8 +34,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
         self.dbHandler = DBhandler()
+        #instantiate the VMs
         self.driverProfilesVM = DriverProfilesViewModel()
         self.trackStatusVM = TrackStatusVM()
+        self.playControlsVM = PlayControlsVM()
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
@@ -54,7 +56,7 @@ class MainWindow(QMainWindow):
         # create the main elements and pass down the switch page function
         self.sidebar = Sidebar(self.switch_page)
         # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage(self.trackStatusVM)
+        self.home = HomePage(trackStatusViewModel = self.trackStatusVM, playControlsViewModel = self.playControlsVM)
         self.settings = DataAnalysisPage()
         # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here,
         self.driverProfiles = DriverProfiles(self.driverProfilesVM)

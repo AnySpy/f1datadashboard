@@ -27,6 +27,7 @@ class TrackStatusVM(QObject):
         # on init set Signals and class vars to normal
         self.currentTrackSafety = "normal"
         self.currentTrackSurface = "normal"
+        self.currentIndex = 1
         # self.updatedTrackSurface.emit(self.currentTrackSurface)
         # self.updatedTrackSafety.emit(self.currentTrackSafety)
         # create a new DBhandler for fetching track info
@@ -65,11 +66,11 @@ class TrackStatusVM(QObject):
         return self.currentTrackSurface
 
     #  approxTime: float = 0.00, currentSessionID: int = 1, currentIndex: int = -1, endFlag: bool = False
-    def fetchSafetyStatus(self):
+    def fetchSafetyStatus(self, currentSessionID: int):
         """_grabs data from the dbHandler and calls to set the safety status_"""
         # fetch status from DB
         newStatus = self.dbHandler.getTrackSafetyStatus(
-            currentSessionID=1, currentIndex=1, endFlag=False
+            currentSessionID, self.currentIndex, endFlag=False
         )
         # stub value need to wright a try except block for getting data from db
         self.setSafetyStatus(newStatus["message"])
@@ -195,7 +196,6 @@ class PlayControlsVM(QObject):
     updatedTime = Signal(float)
     updatedRaceDuration = Signal(float)
     # this should probably be a property of play controls it will need to listen to changes
-    currentSessionID: int = 1
     updatedPlayingStatus = Signal(bool)
     # used to display time on play back slider
     # updatedFormattedTime = Signal(str)
@@ -207,7 +207,7 @@ class PlayControlsVM(QObject):
         # read only 
         self.dbhandler = DBhandler()
         # load session times to the session table
-        self.fetchRaceDuration(self.currentSessionID)
+        # self.fetchRaceDuration(self.currentSessionID)
 
     def togglePlay(self, timeAtTogglePressed):
         # if simulation is playing then pause
@@ -220,15 +220,16 @@ class PlayControlsVM(QObject):
             self.updatedPlayingStatus.emit(True)
         
         return 0 
-    def setCurrentTime(self):
+    def setCurrentTime(self, newCurrentTime):
         # make what ever is reading the data convert the convert the time to a string and update the updatedTime hour: minute: second
-
-        return 0
+        self.currentTime = newCurrentTime
+        self.updatedTime.emit(newCurrentTime)
+        
     def fetchRaceDuration(self, sessionID) -> float:
         """
         query lap 1 
         """
-        totalDuration: float = self.dbhandler.getSessionTime(self.currentSessionID)
+        totalDuration: float = self.dbhandler.getSessionTime(sessionID)
         # might need to handle if the value is None
         self.setRaceDuration(totalDuration)
 

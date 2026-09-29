@@ -79,6 +79,11 @@ class PlayControlsUI(Card):
     def __init__(self, playControlsController: PlayControlsVM):
         super().__init__()
         self.playControlsVM = playControlsController
+        self.raceDuration: float = 0.00
+        self.formattedTime: str = "00:00:00"
+
+        #connect on duration change to the playControlsVM
+        self.playControlsVM.updatedRaceDuration.connect(self.onDurationChange)
         layout = QVBoxLayout(self)
         #scrub bar
         scrub_row = QHBoxLayout()
@@ -86,7 +91,7 @@ class PlayControlsUI(Card):
         # ? I had to change this to Qt.Orientation.Horizontal to get it to compile for some reason. Apparently it's a newer change with PySide6?
         self.scrub_slider = QSlider(Qt.Orientation.Horizontal)
         self.scrub_slider.setRange(0, 100)  # will be rescaled once duration is known
-        self.duration_label = QLabel("00:00")
+        self.duration_label = QLabel(self.formattedTime)
 
         scrub_row.addWidget(self.position_label)
         scrub_row.addWidget(self.scrub_slider)
@@ -107,12 +112,24 @@ class PlayControlsUI(Card):
         #change playback speed
     def setRaceDuration():
         print("setting race duration")
+    def _formatTime(self, totalSeconds: float):
+        totalSeconds = int(round(totalSeconds))
+        hours = totalSeconds // 3600
+        minutes = (totalSeconds % 3600) // 60
+        seconds = totalSeconds % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    
+    def onDurationChange(self, newDuration):
+        self.raceDuration = newDuration
+        self.formattedTime = self._formatTime(newDuration)
+        self.duration_label.setText(self.formattedTime)
         
 class HomePage(QWidget):
-    def __init__(self, view_model: TrackStatusVM):
+    def __init__(self, trackStatusViewModel: TrackStatusVM, playControlsViewModel):
         super().__init__()
-        self.monitorTrackStatus = TrackStatusVM()
-        self.playControlsController = PlayControlsVM()
+        self.monitorTrackStatus = trackStatusViewModel
+        self.playControlsController = playControlsViewModel
+        self.currentSessionID = 1
         # make a grid layout of 13x11ish
         # grid layout (rowstart, colstart, spanrows, spancols)
         gridLayout = QGridLayout(self)
@@ -129,7 +146,8 @@ class HomePage(QWidget):
         gridLayout.addWidget(driverTelemetryCard1, 4, 0, 1, 4)
         driverTelemetryCard2 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
-        self.monitorTrackStatus.fetchSafetyStatus()
+        self.monitorTrackStatus.fetchSafetyStatus(self.currentSessionID)
+        self.playControlsController.fetchRaceDuration(self.currentSessionID)
 
 
 class DriverSIM(Card):
