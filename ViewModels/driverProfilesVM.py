@@ -86,7 +86,7 @@ class DriverProfilesViewModel(QObject):
     def img_changed(self):
         return self.__img_loaded
 
-    def __init__(self, dbhandler: DBhandler):
+    def __init__(self):
         """Generic initialization of the `DriverProfilesViewModel` class
 
         Args:
@@ -94,7 +94,7 @@ class DriverProfilesViewModel(QObject):
         """
         super().__init__()
 
-        self.dbhandler = dbhandler
+        self.dbhandler = DBhandler()
 
         self.scraper = DriverStatScraper()
         self.thread_pool = QThreadPool.globalInstance()

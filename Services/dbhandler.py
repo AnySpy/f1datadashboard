@@ -1,7 +1,6 @@
 import sqlite3
-from Services.database import DB_PATH
-from tests.SignalTesting import redColor, resetColor
 from Services import database
+from fastf1.events import Session
 
 """
     SCHEMA:
@@ -31,7 +30,7 @@ from Services import database
 # can't be passed as "?" parameters in SQLite, so they get built into the
 # query string -- this whitelist makes sure only known names ever get there.
 ALLOWED_COLUMNS: dict = {
-    "sessions": {"session_id", "year", "event_name", "session_type", "total_laps"},
+    "sessions": {"session_id", "year", "event_name", "session_type", "total_laps", "total_time"},
     "laps": {
         "lap_id",
         "session_id",
@@ -85,7 +84,7 @@ class DBhandler:
     def __init__(self):
         print("loading...")
         database.create_schema()
-        self.conn = sqlite3.connect(DB_PATH)
+        self.conn = sqlite3.connect(database.DB_PATH)
 
     def close(self) -> None:
         """closes the database connection"""
@@ -127,6 +126,7 @@ class DBhandler:
         for column in columns:
             if column not in ALLOWED_COLUMNS[tableName]:
                 raise ValueError(f"unknown column '{column}' for table {tableName}")
+        print("dbhandler.py/_checkNames: Valid access to tables within database")
 
     def getSessionID(self, tableName: str, searchIndex: int) -> int:
         """
@@ -143,12 +143,56 @@ class DBhandler:
         )
         sessionID = cursor.fetchone()
         if sessionID is None:
-            print(redColor + "session_id could not be found" + resetColor + "\n")
+            print("session_id could not be found\n")
             return -1
         # fetchone() returns a tuple like (1,) -- return the number inside it
         return sessionID[0]
 
-    def getDataFromTable(
+    def _calculateTotalSessionTime(session: Session) -> float:
+        """ 
+        Args:
+            session_id (int): _session id of race to calculate total time_
+
+        Returns:
+            float: _returns the total race duration_
+        """
+
+        """Time | pd.Timedelta | The drivers total race time 
+        (values only given if session is ‘Race’, ‘Sprint’, ‘Sprint Shootout’ or 
+        ‘Sprint Qualifying’ >and the driver was not more than one lap behind 
+        the leader"""
+        # can I just pass the memory location so I don't have to load it again
+        # this makes a new DF
+        newSessionStatus = session.session_status
+        startFlag = newSessionStatus.loc[newSessionStatus["Status"] == "Started", "Time"].iloc[0]
+        endFlag = newSessionStatus.loc[newSessionStatus["Status"] == "Finished", "Time"].iloc[-1]
+        raceDuration = (endFlag - startFlag).total_seconds()
+        print(f"{session.name} total session time = {raceDuration}")
+        return raceDuration
+    
+    def _setSessionTotalTime():
+        """
+        _This function needs to be able to set if not set each session time in the session table with the proper session time_
+        """
+        print("setting total time of sessions")
+    def getSessionTime(self, session_id: int):
+        """_summary_ sends the race duration of specified session to the playControlsVM
+
+        Args:
+            session_id (int): _this is the race session that you are trying to search for_
+
+        Returns:
+            _float_: _returns a float value that is the race duration in seconds_
+        """
+        sessionTime: float
+        # testing print statement
+        print(f"dbhandler.py/getSessionTime: attempting to find session time at session{session_id}")
+        sessionDF = self._getDataFromTable(tableName= "sessions", searchBy = "first_entry", searchData= session_id, attributeNameTuple= ("total_time",), sessionID= session_id)
+        # convert DF to float | just take the first value from the tuple
+        sessionTime: float = sessionDF[0]
+        return sessionTime
+    
+    def _getDataFromTable(
         self,
         tableName: str,
         searchBy: str,
@@ -167,7 +211,7 @@ class DBhandler:
               the play controls just works -- no stored index to go stale.
         Args:
             tableName (str): the name of the table being accessed
-            searchBy (str): the manner of which you are searching entry_id | time
+            searchBy (str): the manner of which you are searching entry_id | time | first_entry
             searchData (int): the index of row needed | the approxtime of data
             attributeNameTuple (tuple): attributes needed to be returned
             sessionID (int): required when searchBy == "time" -- times restart
@@ -197,10 +241,15 @@ class DBhandler:
                 f"ORDER BY {timeColumn} DESC, entry_id DESC LIMIT 1"
             )
             cursor.execute(dbQuery, (sessionID, float(searchData)))
-        else:
-            self._checkNames(tableName, (searchBy,))
+        elif(searchBy == "entry_id"):
             dbQuery = (
                 f"SELECT {attributes} FROM {tableName} WHERE {searchBy} = ? LIMIT 1"
+            )
+            cursor.execute(dbQuery, (searchData,))
+        elif(searchBy == "first_entry"):
+            # search by first row that returns for specified session_id NOTE find another attribute to order by
+            dbQuery = (
+                f"SELECT {attributes} FROM {tableName} WHERE session_id = ? ORDER BY session_id LIMIT 1"
             )
             cursor.execute(dbQuery, (searchData,))
 
@@ -261,7 +310,7 @@ class DBhandler:
         trackTableData: tuple | None
         if currentIndex == -1:
             # pull data via approxTime (nearest entry at or before it)
-            trackTableData = self.getDataFromTable(
+            trackTableData = self._getDataFromTable(
                 tableName="trackStatus",
                 searchBy="time",
                 searchData=approxTime,
@@ -270,18 +319,14 @@ class DBhandler:
             )
         else:
             # pull data via entry_id
-            trackTableData = self.getDataFromTable(
+            trackTableData = self._getDataFromTable(
                 tableName="trackStatus",
                 searchBy="entry_id",
                 searchData=currentIndex,
                 attributeNameTuple=columns,
             )
             if trackTableData is not None and trackTableData[1] != currentSessionID:
-                print(
-                    redColor
-                    + f"entry {currentIndex} belongs to session {trackTableData[1]}, not {currentSessionID}"
-                    + resetColor
-                )
+                print( f"entry {currentIndex} belongs to session {trackTableData[1]}, not {currentSessionID}")
                 trackTableData = None
 
         if trackTableData is None:

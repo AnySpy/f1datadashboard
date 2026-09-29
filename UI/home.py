@@ -111,7 +111,7 @@ class PlayControlsUI(Card):
 class HomePage(QWidget):
     def __init__(self, view_model: TrackStatusVM):
         super().__init__()
-        self.monitorTrackStatus = view_model
+        self.monitorTrackStatus = TrackStatusVM()
         self.playControlsController = PlayControlsVM()
         # make a grid layout of 13x11ish
         # grid layout (rowstart, colstart, spanrows, spancols)

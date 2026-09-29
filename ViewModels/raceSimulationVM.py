@@ -22,14 +22,18 @@ class TrackStatusVM(QObject):
     def updatedTrackSurface(self):
         return self.__updatedTrackSurface
 
-    def __init__(self, dbHandler: DBhandler):
+    def __init__(self):
         super().__init__()
         # on init set Signals and class vars to normal
         self.currentTrackSafety = "normal"
         self.currentTrackSurface = "normal"
         # self.updatedTrackSurface.emit(self.currentTrackSurface)
         # self.updatedTrackSafety.emit(self.currentTrackSafety)
-        self.dbHandler = dbHandler
+        # create a new DBhandler for fetching track info
+        """
+            NOTE: Read only
+        """
+        self.dbHandler = DBhandler()
         # fetch status codes from DB on creation
 
     def setSurfaceStatus(self, newStatus: str):
@@ -179,6 +183,9 @@ class PlayControlsVM(QObject):
         - The seconds will need to interact with the player standings so that 
           we don't have to constantly send updates from the View Model
         - This will also need to interact with race simulation
+        - make sure that this doesn't need to ping the signal every millisecond 
+          only update the signals on important changes (togglePlay, newSection, newLap).
+          might need to implement some time correcting if the other vms get out of sync
         WHAT THIS NEEDS TO WORK 
         - needs to have the total session time for each selected session
         - needs to be able to show current time and total time on front end
@@ -186,30 +193,56 @@ class PlayControlsVM(QObject):
         - needs to be able to play / pause simulation
     """
     updatedTime = Signal(float)
-    raceDuration = Signal(float)
+    updatedRaceDuration = Signal(float)
+    # this should probably be a property of play controls it will need to listen to changes
+    currentSessionID: int = 1
+    updatedPlayingStatus = Signal(bool)
     # used to display time on play back slider
-    updatedFormattedTime = Signal(str)
+    # updatedFormattedTime = Signal(str)
     def __init__(self):
         super().__init__()
         self.isPlaying: bool = False
         self.currentTime:float = 0.00
+        self.currentRaceDuration: float = 0.00
+        # read only 
+        self.dbhandler = DBhandler()
+        # load session times to the session table
+        self.fetchRaceDuration(self.currentSessionID)
 
-    def togglePlay(self):
-        #stub
+    def togglePlay(self, timeAtTogglePressed):
+        # if simulation is playing then pause
+        if(self.isPlaying):
+            self.isPlaying = False
+            self.updatedPlayingStatus.emit(False)
+            self.setCurrentTime()
+        else:
+            self.isPlaying = True
+            self.updatedPlayingStatus.emit(True)
+        
         return 0 
     def setCurrentTime(self):
         # make what ever is reading the data convert the convert the time to a string and update the updatedTime hour: minute: second
+
         return 0
-    def setRaceDuration(self):
+    def fetchRaceDuration(self, sessionID) -> float:
         """
         query lap 1 
         """
-        print("setting race duration")
+        totalDuration: float = self.dbhandler.getSessionTime(self.currentSessionID)
+        # might need to handle if the value is None
+        self.setRaceDuration(totalDuration)
+
+    def setRaceDuration(self, newDuration: float):
+        print(f"raceSimulationVM.py/PlayControlsVM/setRaceDuration: attempting to set new duration to {newDuration}")
+        if(newDuration != self.currentRaceDuration):
+            self.currentRaceDuration = newDuration
+            print(f"raceSimulationVM.py/setRaceDuration: newDuration is different from currentDuration so send a signal to update")
+            self.updatedRaceDuration.emit(newDuration)
+            
 
     def seek(self):
         #stub
         return 0
-    
     
 
 

@@ -8,7 +8,11 @@ from UI.dataAnalysisPage import DataAnalysisPage
 from UI.driverProfiles import DriverProfiles
 
 # Import VMs
+"""
+NOTE: are we placing these to 'high' are we allowing too many objects to view these VM's
+"""
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
+from ViewModels.raceSimulationVM import PlayControlsVM
 from ViewModels.raceSimulationVM import TrackStatusVM
 
 # import dbhandler
@@ -30,8 +34,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("F1 Data Analysis")
         self.dbHandler = DBhandler()
-        self.driverProfilesVM = DriverProfilesViewModel(self.dbHandler)
-        self.trackStatusVM = TrackStatusVM(self.dbHandler)
+        self.driverProfilesVM = DriverProfilesViewModel()
+        self.trackStatusVM = TrackStatusVM()
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
