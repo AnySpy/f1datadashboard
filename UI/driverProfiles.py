@@ -36,15 +36,15 @@ class DriverProfiles(QWidget):
 
         self.nav_bar = DriverNavBar(self.driver_codes)
 
-        self.nav_bar.driver_selected.connect(self.view_model.select_driver)
+        self.nav_bar.selected_driver_changed.connect(self.view_model.select_driver)
 
         grid.addWidget(self.nav_bar, 0, 0, 1, 2)
 
         self.driver_about_section = DriverAboutSection(self.view_model)
 
-        self.view_model.bio_loaded.connect(self.driver_about_section.update_bio)
-        self.view_model.name_loaded.connect(self.driver_about_section.update_name)
-        self.view_model.img_loaded.connect(self.driver_about_section.update_img)
+        self.view_model.bio_changed.connect(self.driver_about_section.update_bio)
+        self.view_model.name_changed.connect(self.driver_about_section.update_name)
+        self.view_model.img_changed.connect(self.driver_about_section.update_img)
 
         grid.addWidget(self.driver_about_section, 1, 0)
 
@@ -59,7 +59,11 @@ class DriverProfiles(QWidget):
 
 # Top nav bar. This should probably be a search bar in hindsight, but I like the design of this right now so we're going with it.
 class DriverNavBar(QWidget):
-    driver_selected = Signal(str)
+    __driver_selected = Signal(str)
+
+    @property
+    def selected_driver_changed(self):
+        return self.__driver_selected
 
     def __init__(self, driver_codes: list[str]):
         super().__init__()
@@ -107,14 +111,26 @@ class DriverNavBar(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
     def _on_driver_button_clicked(self, code):
-        self.driver_selected.emit(code)
+        self.selected_driver_changed.emit(code)
 
 
 # Left side, contains a picture, the name of the driver, and their biography
 class DriverAboutSection(QWidget):
-    driver_bio = Signal(str)
-    driver_name = Signal(str)
-    driver_img = Signal(str)
+    __driver_bio = Signal(str)
+    __driver_name = Signal(str)
+    __driver_img = Signal(str)
+
+    @property
+    def driver_bio_changed(self):
+        return self.__driver_bio
+
+    @property
+    def driver_name_changed(self):
+        return self.__driver_name
+
+    @property
+    def driver_image_changed(self):
+        return self.__driver_img
 
     def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
@@ -234,7 +250,7 @@ class DriverStatsSection(QWidget):
         layout.setSpacing(10)
         layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
-        self.view_model.stats_loaded.connect(self.update_stats)
+        self.view_model.stats_changed.connect(self.update_stats)
 
     def update_stats(self, driver_stats: dict[str, str]) -> None:
         while self.career_stats_layout.count():
