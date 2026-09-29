@@ -11,8 +11,16 @@ class TrackStatusVM(QObject):
     """
 
     # Signals
-    updatedTrackSafety = Signal(str)  # normal, yellow flag, red flag
-    updatedTrackSurface = Signal(str)  # normal, damp, hot, etc.
+    __updatedTrackSafety = Signal(str)  # normal, yellow flag, red flag
+    __updatedTrackSurface = Signal(str)  # normal, damp, hot, etc.
+
+    @property
+    def updatedTrackSafety(self):
+        return self.__updatedTrackSafety
+
+    @property
+    def updatedTrackSurface(self):
+        return self.__updatedTrackSurface
 
     def __init__(self, dbHandler: DBhandler):
         super().__init__()
@@ -88,13 +96,25 @@ class DriverStandingsVM(QObject):
     # signals that need to be sent to the front end code
 
     # signal for the current driver(obj)
-    updatedFocusDriver = Signal(object)
+    __updatedFocusDriver = Signal(object)
     # signal for the list of dicts of available drivers "list[drivers]""
-    updatedAvailableDrivers = Signal(list)
+    __updatedAvailableDrivers = Signal(list)
     # list of dictionaries ([driver: "", team: "", laptime: "", sectionTime: "", placement: "", timeBehind: "" ])
-    updatedStandings = Signal(
+    __updatedStandings = Signal(
         list
     )  # could potentially use this to double for list of active drivers
+
+    @property 
+    def updatedFocusDriver(self):
+        return self.__updatedFocusDriver
+
+    @property
+    def updatedAvailableDrivers(self):
+        return self.__updatedAvailableDrivers
+
+    @property
+    def updatedStandings(self):
+        return self.__updatedStandings
 
     def __init__(self):
         super().__init__()
@@ -106,7 +126,7 @@ class DriverStandingsVM(QObject):
     # when user selects a user from the driver standings, show specific telemetry for that driver
     def toggleFocusDriver(self, newDriver: object):
         if newDriver == self.currentFocusDriver:
-            self.updateFocusDriver.emit(None)
+            self.updatedFocusDriver.emit(None)
             self.currentFocusDriver = None
         else:
             self.updatedFocusDriver.emit(newDriver)
@@ -114,7 +134,7 @@ class DriverStandingsVM(QObject):
 
     # return who the focused driver is
     def getFocusDriver(self):
-        return self.focusDriver
+        return self.currentFocusDriver
 
     # grab driver telemetry from db
     def fetchDriverTelemetry(self, focusDriver: object):

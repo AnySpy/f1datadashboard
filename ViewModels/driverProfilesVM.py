@@ -5,7 +5,12 @@ from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 from bs4 import BeautifulSoup
 
 class ImageWorkerSignals(QObject):
-    finished = Signal(QPixmap)
+    # ? Private access variable, the double underscore should prevent use outside of the class unless through the property.
+    __finished = Signal(QPixmap)
+
+    @property
+    def finished_signal(self):
+        return self.__finished
 
 class ImageWorker(QRunnable):
     def __init__(self, scraper: DriverStatScraper, soup: BeautifulSoup, size: int = 100):
@@ -42,7 +47,7 @@ class ImageWorker(QRunnable):
         painter.drawPixmap(0, 0, scaled)
         painter.end()
 
-        self.signals.finished.emit(canvas)
+        self.signals.finished_signal.emit(canvas)
 
 class DriverProfilesViewModel(QObject):
     """_summary_
@@ -60,10 +65,26 @@ class DriverProfilesViewModel(QObject):
 
     """
 
-    stats_loaded = Signal(dict)
-    bio_loaded = Signal(str)
-    name_loaded = Signal(str)
-    img_loaded = Signal(QPixmap)
+    __stats_loaded = Signal(dict)
+    __bio_loaded = Signal(str)
+    __name_loaded = Signal(str)
+    __img_loaded = Signal(QPixmap)
+
+    @property
+    def stats_changed(self):
+        return self.__stats_loaded
+
+    @property
+    def bio_changed(self):
+        return self.__bio_loaded
+
+    @property
+    def name_changed(self):
+        return self.__name_loaded
+
+    @property
+    def img_changed(self):
+        return self.__img_loaded
 
     def __init__(self, dbhandler: DBhandler):
         """Generic initialization of the `DriverProfilesViewModel` class
@@ -208,7 +229,7 @@ class DriverProfilesViewModel(QObject):
 
         soup = self.scraper.get_soup(driver_name)
 
-        assert soup is not None
+        assert soup is not None # TODO: Find a way to fail elegantly
 
         career_stats = self.get_career_stats(soup)
         bio_text = self.get_driver_bio(soup)\
@@ -218,12 +239,12 @@ class DriverProfilesViewModel(QObject):
         if not bio_text:
             bio_text = "Biography Not Available."
 
-        self.stats_loaded.emit(career_stats)
-        self.bio_loaded.emit(bio_text)
-        self.name_loaded.emit(_driver_display_name)
+        self.stats_changed.emit(career_stats)
+        self.bio_changed.emit(bio_text)
+        self.name_changed.emit(_driver_display_name)
         
         worker = ImageWorker(self.scraper, soup)
-        worker.signals.finished.connect(self.img_loaded.emit)
+        worker.signals.finished_signal.connect(self.img_changed.emit)
 
         self.thread_pool.start(worker)
 
