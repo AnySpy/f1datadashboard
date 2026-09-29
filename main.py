@@ -9,7 +9,6 @@ from UI.driverProfiles import DriverProfiles
 
 # Import VMs
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
-from ViewModels.playControlsVM import PlayControlsViewModel
 from ViewModels.raceSimulationVM import TrackStatusVM
 
 # import dbhandler

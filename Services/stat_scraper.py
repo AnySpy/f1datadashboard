@@ -13,21 +13,15 @@ class DriverStatScraper:
             {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         )
 
-    def fetch_driver_stats(self, driver_name: str) -> dict[str, dict[str, str]]:
+    def fetch_driver_stats(self, soup: BeautifulSoup) -> dict[str, dict[str, str]]:
         """Gets the stats of the provided driver
 
         Args:
-            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             dict[str, dict[str, str]]: Two dictionaries: one containing the season stats of the driver and another containing the career stats of the driver.
         """
-        r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
-
-        if r.status_code != 200 or "drivers" not in r.url:
-            return {"seasons": {}, "career": {}}
-
-        soup = BeautifulSoup(r.text, "html.parser")
         driver_stats = {"season": {}, "career": {}}
 
         # ! This feels very fragile and I'd like to find a better way to do this in the future, but for right now it works so :shrug:
@@ -45,7 +39,7 @@ class DriverStatScraper:
         """Gets the driver's image URL from the f1 website
 
         Args:
-            soup (BeautifulSoup): A `BeautifulSoup` object that contains the request text and is using the html parser.
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             str | None: The URL as a string or `None` if there is no valid URL.
@@ -60,20 +54,15 @@ class DriverStatScraper:
 
         return None
 
-    def fetch_driver_image(self, driver_name: str) -> bytes | None:
+    def fetch_driver_image(self, soup: BeautifulSoup) -> bytes | None:
         """Gets the bytestream of the driver's image from the f1 website
 
         Args:
-            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             bytes | None: The bytestream of the image or `None` if there is no valid image found.
         """
-        r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
-        if r.status_code != 200:
-            return None
-
-        soup = BeautifulSoup(r.text, "html.parser")
         img_url = self._fetch_driver_image_url(soup)
         if not img_url:
             return None
@@ -116,23 +105,15 @@ class DriverStatScraper:
 
         return data
 
-    def fetch_driver_bio(self, driver_name: str) -> str:
+    def fetch_driver_bio(self, soup: BeautifulSoup) -> str:
         """Returns the driver's biography from the F1 website
 
         Args:
-            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             str: The biography of the driver as a string.
         """
-        # ? Trying something new with scraping stats. We'll see if this is less fragile.
-        r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
-
-        if r.status_code != 200:
-            return "Biography Not Available."
-
-        soup = BeautifulSoup(r.text, "html.parser")
-
         bio_heading = soup.find(
             lambda tag: (
                 tag.name in ["h2", "h3", "h4", "p"]
@@ -157,12 +138,34 @@ class DriverStatScraper:
 
         return bio_text if bio_text else "Biography Not Available."
 
+    def get_soup(self, driver_name: str) -> BeautifulSoup | None:
+        """Gets a BeautifulSoup object of the f1 page for the provided driver name.
+
+        Args:
+            driver_name (str): The name of the driver in firstname-lastname format (e.g. "max-verstappen")
+
+        Returns:
+            BeautifulSoup | None: A BeautifulSoup object containing the request text and is parsed with the html.parser.
+        """
+        r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
+
+        if r.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        return soup
+
 
 def _main():
     name = "max-verstappen"
     scraper = DriverStatScraper()
 
-    results = scraper.fetch_driver_image(name)
+    soup = scraper.get_soup(name)
+
+    results = "No Soup Found"
+    if soup is not None:
+        results = scraper.fetch_driver_image(soup)
 
     print(results)
 
