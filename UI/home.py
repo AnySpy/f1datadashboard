@@ -83,7 +83,8 @@ class PlayControlsUI(Card):
         #scrub bar
         scrub_row = QHBoxLayout()
         self.position_label = QLabel("00:00")
-        self.scrub_slider = QSlider(Qt.Horizontal)
+        # ? I had to change this to Qt.Orientation.Horizontal to get it to compile for some reason. Apparently it's a newer change with PySide6?
+        self.scrub_slider = QSlider(Qt.Orientation.Horizontal)
         self.scrub_slider.setRange(0, 100)  # will be rescaled once duration is known
         self.duration_label = QLabel("00:00")
 

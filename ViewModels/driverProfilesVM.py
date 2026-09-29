@@ -1,8 +1,53 @@
-from PySide6.QtCore import QObject, Signal, QByteArray, Qt
+from PySide6.QtCore import QObject, Signal, QByteArray, Qt, QRunnable, QThreadPool
 from Services.stat_scraper import DriverStatScraper
 from Services.dbhandler import DBhandler
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
+from bs4 import BeautifulSoup
 
+class ImageWorkerSignals(QObject):
+    # ? Private access variable, the double underscore should prevent use outside of the class unless through the property.
+    __finished = Signal(QPixmap)
+
+    @property
+    def finished_signal(self):
+        return self.__finished
+
+class ImageWorker(QRunnable):
+    def __init__(self, scraper: DriverStatScraper, soup: BeautifulSoup, size: int = 100):
+        super().__init__()
+        self.scraper = scraper
+        self.soup = soup
+        self.size = size
+        self.signals = ImageWorkerSignals()
+
+    def run(self):
+        image_bytes = self.scraper.fetch_driver_image(self.soup)
+
+        pixmap = QPixmap()
+        if not (image_bytes and pixmap.loadFromData(QByteArray(image_bytes))):
+            # TODO: Replace this with a generic "Driver Not Found" image later
+            pixmap = QPixmap("images/sample_driver.jpg")
+
+        scaled = pixmap.scaled(
+            self.size, self.size,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation
+        )
+
+        canvas = QPixmap(self.size, self.size)
+        canvas.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(canvas)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        path = QPainterPath()
+        path.addEllipse(0, 0, self.size, self.size)
+
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, scaled)
+        painter.end()
+
+        self.signals.finished_signal.emit(canvas)
 
 class DriverProfilesViewModel(QObject):
     """_summary_
@@ -20,10 +65,26 @@ class DriverProfilesViewModel(QObject):
 
     """
 
-    stats_loaded = Signal(dict)
-    bio_loaded = Signal(str)
-    name_loaded = Signal(str)
-    img_loaded = Signal(QPixmap)
+    __stats_loaded = Signal(dict)
+    __bio_loaded = Signal(str)
+    __name_loaded = Signal(str)
+    __img_loaded = Signal(QPixmap)
+
+    @property
+    def stats_changed(self):
+        return self.__stats_loaded
+
+    @property
+    def bio_changed(self):
+        return self.__bio_loaded
+
+    @property
+    def name_changed(self):
+        return self.__name_loaded
+
+    @property
+    def img_changed(self):
+        return self.__img_loaded
 
     def __init__(self):
         """Generic initialization of the `DriverProfilesViewModel` class
@@ -36,6 +97,8 @@ class DriverProfilesViewModel(QObject):
         self.dbhandler = DBhandler()
 
         self.scraper = DriverStatScraper()
+        self.thread_pool = QThreadPool.globalInstance()
+
         # ? Initializing this here in case we need to remember this data between state changes. It'd be easy to remove this later if we want to.
         self.current_stats: dict[str, str] = {}
 
@@ -67,56 +130,16 @@ class DriverProfilesViewModel(QObject):
 
         return list(dict.keys())
 
-    def get_driver_bio(self, driver_name: str) -> str:
+    def get_driver_bio(self, soup: BeautifulSoup) -> str:
         """Gets the driver bio as a string
 
         Args:
-            driver_name (str): The name of the driver in firstname-lastname format (e.g. "max-verstappen")
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             str: The biography of the driver
         """
-        return self.scraper.fetch_driver_bio(driver_name)
-
-    def get_driver_image(self, driver_name: str) -> QPixmap:
-        """Returns the driver image formatted to be the profile image for the driver profile.
-
-        Args:
-            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
-
-        Returns:
-            QPixmap: A canvas object that is ready to be displayed to the user.
-        """
-        img_bytes = self.scraper.fetch_driver_image(driver_name)
-        pixmap = QPixmap()
-
-        if img_bytes and pixmap.loadFromData(QByteArray(img_bytes)):
-            pass
-        else:
-            # TODO: This should be replaced with a generic "Driver Not Found" eventually
-            pixmap = QPixmap("images/sample_driver.jpg")
-
-        # ? The idea is that we scale the image down to 100x100, create a canvas object of the same size,
-        # ?     create a painter object with a circular path that then paints the image as a circle onto the canvas,
-        # ?     and then creates a label holder for that image to display the canvas in the UI.
-        # ? It's kind of disgusting and I hate it but I couldn't figure out how to do it in QSS. If we could figure that out, it'd be much better.
-        image = pixmap.scaled(
-            100,
-            100,
-            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        canvas = QPixmap(100, 100)
-        canvas.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(canvas)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter_path = QPainterPath()
-        painter_path.addEllipse(0, 0, 100, 100)
-        painter.setClipPath(painter_path)
-        painter.drawPixmap(0, 0, image)
-        painter.end()
-
-        return canvas
+        return self.scraper.fetch_driver_bio(soup)
 
     def get_formatted_placements(
         self, placement_history: list[int], location_history: list[str]
@@ -150,17 +173,17 @@ class DriverProfilesViewModel(QObject):
                 placement_string = f"{place}th"
         return placement_string
 
-    def _load_driver_stats(self, driver_name: str, scope: str) -> dict[str, str]:
+    def _load_driver_stats(self, soup: BeautifulSoup, scope: str) -> dict[str, str]:
         """Loads the driver stats from the F1 website
 
         Args:
-            driver_name (str): The name of the driver in firstname-lastname format (e.g. "max-verstappen")
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
             scope (str): Whether to use the scope of "season" or "career" for stats.
 
         Returns:
             dict[str, str]: The stats returned in a pairing of "Title": "Value"
         """
-        data = self.scraper.fetch_driver_stats(driver_name)
+        data = self.scraper.fetch_driver_stats(soup)
 
         if not data:
             return {"ERROR": "Data Unavailable"}
@@ -169,27 +192,27 @@ class DriverProfilesViewModel(QObject):
 
         return self.current_stats
 
-    def get_season_stats(self, driver_name: str) -> dict[str, str]:
+    def get_season_stats(self, soup: BeautifulSoup) -> dict[str, str]:
         """Returns the given driver's season stats
 
         Args:
-            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             dict[str, str]: A dictionary containing the key of the title of the stat and the value of the value of said stat.
         """
-        return self._load_driver_stats(driver_name, "season")
+        return self._load_driver_stats(soup, "season")
 
-    def get_career_stats(self, driver_name: str):
+    def get_career_stats(self, soup: BeautifulSoup):
         """Returns the given driver's career stats
 
         Args:
-            driver_name (str): Name of the driver provided in the format "firstname-lastname" (e.g. "max-verstappen")
+           soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
 
         Returns:
             dict[str, str]: A dictionary containing the key of the title of the stat and the value of the value of said stat.
         """
-        return self._load_driver_stats(driver_name, "career")
+        return self._load_driver_stats(soup, "career")
 
     def select_driver(self, driver_code: str):
         """Binds to the signal objects from the driverProfiles to update the display
@@ -204,19 +227,26 @@ class DriverProfilesViewModel(QObject):
         _driver_display_name = driver_name
         driver_name = driver_name.lower().replace(" ", "-")
 
-        career_stats = self.get_career_stats(driver_name)
-        bio_text = self.get_driver_bio(driver_name)
-        driver_img = self.get_driver_image(driver_name)
+        soup = self.scraper.get_soup(driver_name)
+
+        assert soup is not None # TODO: Find a way to fail elegantly
+
+        career_stats = self.get_career_stats(soup)
+        bio_text = self.get_driver_bio(soup)\
 
         if not career_stats:
             career_stats = {"Status": "No Stats Available"}
         if not bio_text:
             bio_text = "Biography Not Available."
 
-        self.stats_loaded.emit(career_stats)
-        self.bio_loaded.emit(bio_text)
-        self.name_loaded.emit(_driver_display_name)
-        self.img_loaded.emit(driver_img)
+        self.stats_changed.emit(career_stats)
+        self.bio_changed.emit(bio_text)
+        self.name_changed.emit(_driver_display_name)
+        
+        worker = ImageWorker(self.scraper, soup)
+        worker.signals.finished_signal.connect(self.img_changed.emit)
+
+        self.thread_pool.start(worker)
 
     def setActiveDriver(self):
         # stub
