@@ -1,86 +1,5 @@
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, QTimer
 from Services.dbhandler import DBhandler
-
-
-class TrackStatusVM(QObject):
-    """
-    TODO:
-        - refactor track status fetch functions to work with getting info from the db
-        - add currentIndex and approxTime to the vars on init
-        - add logic to determine if track is wet or dry
-    """
-
-    # Signals
-    __updatedTrackSafety = Signal(str)  # normal, yellow flag, red flag
-    __updatedTrackSurface = Signal(str)  # normal, damp, hot, etc.
-
-    @property
-    def updatedTrackSafety(self):
-        return self.__updatedTrackSafety
-
-    @property
-    def updatedTrackSurface(self):
-        return self.__updatedTrackSurface
-
-    def __init__(self):
-        super().__init__()
-        # on init set Signals and class vars to normal
-        self.currentTrackSafety = "normal"
-        self.currentTrackSurface = "normal"
-        self.currentIndex = 1
-        # self.updatedTrackSurface.emit(self.currentTrackSurface)
-        # self.updatedTrackSafety.emit(self.currentTrackSafety)
-        # create a new DBhandler for fetching track info
-        """
-            NOTE: Read only
-        """
-        self.dbHandler = DBhandler()
-        # fetch status codes from DB on creation
-
-    def setSurfaceStatus(self, newStatus: str):
-        # this could affect 2 views in the Front end so may add a Signal
-        if newStatus != self.currentTrackSurface:
-            self.currentTrackSurface = newStatus
-            self.updatedTrackSurface.emit(newStatus)
-
-    def setSafetyStatus(self, newStatus: str):
-        """_summary_
-
-        Args:
-            newStatus (str): _this is the new status that was grabbed from database_
-
-        Returns:
-            _int_: _returns 0 if there are no errors_
-        """
-        # might need to run a check that newstatus is an accepted status
-        if newStatus != self.currentTrackSafety:
-            self.currentTrackSafety = newStatus
-            self.updatedTrackSafety.emit(newStatus)
-        else:
-            return 0  # no error
-
-    def getSafetyStatus(self):
-        return self.currentTrackSafety
-
-    def getSurfaceStatus(self):
-        return self.currentTrackSurface
-
-    #  approxTime: float = 0.00, currentSessionID: int = 1, currentIndex: int = -1, endFlag: bool = False
-    def fetchSafetyStatus(self, currentSessionID: int):
-        """_grabs data from the dbHandler and calls to set the safety status_"""
-        # fetch status from DB
-        newStatus = self.dbHandler.getTrackSafetyStatus(
-            currentSessionID, self.currentIndex, endFlag=False
-        )
-        # stub value need to wright a try except block for getting data from db
-        self.setSafetyStatus(newStatus["message"])
-
-    def fetchSurfaceStatus(self):
-        # fetch status from DB
-        # newStatus = dbHandler.getSafetyStatus()
-        # stub value need to wright a try except block for getting data from db
-        self.setSurfaceStatus("test")
-
 
 class DriverStandingsVM(QObject):
     """_summary_
@@ -208,18 +127,33 @@ class PlayControlsVM(QObject):
         self.dbhandler = DBhandler()
         # load session times to the session table
         # self.fetchRaceDuration(self.currentSessionID)
+        # slider properties
+        
+        # create timer
+        self.timer = QTimer(self)
+        # set interval to 1000ms or 1 second smallest measurement we need
+        self.timer.setInterval(1000)
+        self.timer.timeout.connect(self._tick)
+        # test
+        self.timer.start()
+
+
+    def _tick(self):
+        # print(f"timer = {self.currentTime + 1}")
+        self.setCurrentTime(self.currentTime + 1)
 
     def togglePlay(self, timeAtTogglePressed):
         # if simulation is playing then pause
         if(self.isPlaying):
             self.isPlaying = False
             self.updatedPlayingStatus.emit(False)
-            self.setCurrentTime()
+            self.timer.stop()
+            self.setCurrentTime(timeAtTogglePressed)
         else:
             self.isPlaying = True
             self.updatedPlayingStatus.emit(True)
-        
-        return 0 
+            self.timer.start()
+
     def setCurrentTime(self, newCurrentTime):
         # make what ever is reading the data convert the convert the time to a string and update the updatedTime hour: minute: second
         self.currentTime = newCurrentTime

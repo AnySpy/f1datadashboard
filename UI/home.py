@@ -1,7 +1,8 @@
 # basic test application
 from PySide6.QtCore import Signal,Qt
 from UI.Theme import theme
-from ViewModels.raceSimulationVM import TrackStatusVM, PlayControlsVM
+from ViewModels.raceSimulationVM import PlayControlsVM
+from ViewModels.trackStatusVM import TrackStatusVM
 from Services.dbhandler import DBhandler
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -74,7 +75,7 @@ class TrackStatusCard(Card):
         self.message = status
         self.statusLabel.setText(self.message)
 
-        
+
 class PlayControlsUI(Card):
     def __init__(self, playControlsController: PlayControlsVM):
         super().__init__()
@@ -84,52 +85,79 @@ class PlayControlsUI(Card):
 
         #connect on duration change to the playControlsVM
         self.playControlsVM.updatedRaceDuration.connect(self.onDurationChange)
+        self.playControlsVM.updatedTime.connect(self.onCurrentTimeChange)
         layout = QVBoxLayout(self)
         #scrub bar
-        scrub_row = QHBoxLayout()
-        self.position_label = QLabel("00:00")
+        scrubRow = QHBoxLayout()
+        self.currentTimeLabel = QLabel("00:00")
         # ? I had to change this to Qt.Orientation.Horizontal to get it to compile for some reason. Apparently it's a newer change with PySide6?
-        self.scrub_slider = QSlider(Qt.Orientation.Horizontal)
-        self.scrub_slider.setRange(0, 100)  # will be rescaled once duration is known
-        self.duration_label = QLabel(self.formattedTime)
+        # create the slider NOTE: might want to make this it's own class later on
+        self.scrubSlider = QSlider(Qt.Orientation.Horizontal)
+        self.scrubSlider.setRange(0, 100)  # will be rescaled once duration is known
+        self.durationLabel = QLabel(self.formattedTime)
+        # set the signal changes
+        self.scrubSlider.valueChanged.connect(self._onSliderValueChanged)
+        self.scrubSlider.sliderPressed.connect(self._onSliderPressed)
+        self.scrubSlider.sliderReleased.connect(self._onSliderReleased)
+        # is slider being messed with 
+        self.sliderInUse: bool = False
 
-        scrub_row.addWidget(self.position_label)
-        scrub_row.addWidget(self.scrub_slider)
-        scrub_row.addWidget(self.duration_label)
-        layout.addLayout(scrub_row)
+        scrubRow.addWidget(self.currentTimeLabel)
+        scrubRow.addWidget(self.scrubSlider)
+        scrubRow.addWidget(self.durationLabel)
+        layout.addLayout(scrubRow)
 
 # on UI element change call viewModel.set{action} then have the set action updated a signal that the UI reads
 
     def onClickPlay():
         print("user clicked play/pause")
 
-    def onSliderMoved():
+    def _onSliderPressed(self):
+        # stop the slider from updating from currentTime changing
+        self.playControlsVM.timer.blockSignals(True)
+        self.sliderInUse = True
+    def _onSliderReleased(self):
+        # allow the slider to update from currentTime changing
+        self.playControlsVM.timer.blockSignals(False)
+        self.sliderInUse = False
+    def _onSliderValueChanged(self):
         print("slider moved")
         # take time that slider displays then set the currentTime in the playControls VM
+        self.playControlsVM.setCurrentTime(self.scrubSlider.value())
 
     def onPlaybackSpeedChanged():
         print("playback speed changed")
         #change playback speed
-    def setRaceDuration():
-        print("setting race duration")
+
     def _formatTime(self, totalSeconds: float):
         totalSeconds = int(round(totalSeconds))
         hours = totalSeconds // 3600
         minutes = (totalSeconds % 3600) // 60
         seconds = totalSeconds % 60
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    
+   
+    def onCurrentTimeChange(self, newCurrentTime):
+        #self.scrubSlider.blockSignals(True)
+        time = self._formatTime(newCurrentTime)
+        self.currentTimeLabel.setText(time)
+        #self.scrubSlider.blockSignals(False)
+        # update slider if not being dragged
+   
     def onDurationChange(self, newDuration):
+        #self.scrubSlider.blockSignals(True)
         self.raceDuration = newDuration
         self.formattedTime = self._formatTime(newDuration)
-        self.duration_label.setText(self.formattedTime)
-        
+        self.scrubSlider.setRange(0, int(self.raceDuration))
+        self.durationLabel.setText(self.formattedTime)
+        #self.scrubSlider.blockSignals(False)
+
 class HomePage(QWidget):
     def __init__(self, trackStatusViewModel: TrackStatusVM, playControlsViewModel):
         super().__init__()
         self.monitorTrackStatus = trackStatusViewModel
         self.playControlsController = playControlsViewModel
         self.currentSessionID = 1
+        
         # make a grid layout of 13x11ish
         # grid layout (rowstart, colstart, spanrows, spancols)
         gridLayout = QGridLayout(self)
@@ -146,7 +174,7 @@ class HomePage(QWidget):
         gridLayout.addWidget(driverTelemetryCard1, 4, 0, 1, 4)
         driverTelemetryCard2 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
-        self.monitorTrackStatus.fetchSafetyStatus(self.currentSessionID)
+        self.monitorTrackStatus.fetchSafetyStatus(searchData= 1, searchBy="entry_id")
         self.playControlsController.fetchRaceDuration(self.currentSessionID)
 
 

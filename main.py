@@ -13,7 +13,7 @@ NOTE: are we placing these to 'high' are we allowing too many objects to view th
 """
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
 from ViewModels.raceSimulationVM import PlayControlsVM
-from ViewModels.raceSimulationVM import TrackStatusVM
+from ViewModels.trackStatusVM import TrackStatusVM
 
 # import dbhandler
 from Services.dbhandler import DBhandler
@@ -36,8 +36,9 @@ class MainWindow(QMainWindow):
         self.dbHandler = DBhandler()
         #instantiate the VMs
         self.driverProfilesVM = DriverProfilesViewModel()
-        self.trackStatusVM = TrackStatusVM()
+        
         self.playControlsVM = PlayControlsVM()
+        self.trackStatusVM = TrackStatusVM(playControlsVM = self.playControlsVM)
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
