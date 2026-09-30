@@ -187,12 +187,12 @@ class DBhandler:
         sessionTime: float
         # testing print statement
         print(f"dbhandler.py/getSessionTime: attempting to find session time at session{session_id}")
-        sessionDF = self._getDataFromTable(tableName= "sessions", searchBy = "first_entry", searchData= session_id, attributeNameTuple= ("total_time",), sessionID= session_id)
+        sessionDF = self.getDataFromTable(tableName= "sessions", searchBy = "first_entry", searchData= session_id, attributeNameTuple= ("total_time",), sessionID= session_id)
         # convert DF to float | just take the first value from the tuple
         sessionTime: float = sessionDF[0]
         return sessionTime
     
-    def _getDataFromTable(
+    def getDataFromTable(
         self,
         tableName: str,
         searchBy: str,
@@ -227,6 +227,7 @@ class DBhandler:
         self._checkNames(tableName, attributeNameTuple)
         # join the tuple to one string
         attributes = ", ".join(attributeNameTuple)
+        print(f"dbhandler.py/_getDataFromTable: from {tableName} grab {attributes}")
         cursor = self.conn.cursor()
 
         if searchBy == "time":
@@ -255,11 +256,13 @@ class DBhandler:
 
         results = cursor.fetchone()
         if results is None:
-            print(f"No data found at {searchData}")
+            print(f"dbhandler.py/getDataFromTable: No data found at {searchData}")
             return None
         # return data from dbQuery to the function that needs it
+        # NOTE: might be nice to return a dictionary so that it is easier to read from
         return results
 
+    # NOTE: Flagged for depreciation once moved to trackStatusVM
     def _getNextStatusChange(
         self, sessionID: int, entryID: int, time: float
     ) -> float | None:
@@ -271,6 +274,7 @@ class DBhandler:
             _type_ None: there are no more changes -> this is the last one (endFlag)
         """
         cursor = self.conn.cursor()
+        print(f"dbhandler.py/_getNextStatusChange: attempting to get the time at which the next status change happens within session {sessionID}")
         cursor.execute(
             """
             SELECT time FROM trackStatus
@@ -282,8 +286,10 @@ class DBhandler:
             (sessionID, time, time, entryID),
         )
         nextRow = cursor.fetchone()
+        print(f"data found: {nextRow}")
         return None if nextRow is None else nextRow[0]
 
+    # NOTE: flagged for depreciation once validation checks are moved to trackStatusVM
     def getTrackSafetyStatus(
         self,
         approxTime: float = 0.00,
@@ -338,8 +344,7 @@ class DBhandler:
             return trackStatusData
 
         entryID, _, time, statusCode, message = trackTableData
-        nextChangeTime = self._getNextStatusChange(currentSessionID, entryID, time)
-
+        nextChangeTime: float | None = self._getNextStatusChange(currentSessionID, entryID, time)
         # set trackStatusData to send to trackStatusVM
         trackStatusData: dict = {
             "entry_id": entryID,
@@ -349,6 +354,7 @@ class DBhandler:
             "endFlag": nextChangeTime is None,
             "nextChangeTime": nextChangeTime,
         }
+        print(f"dbhandler.py/DBhandler/getTrackSafetyStatus: nextChangeTime in trackStatusData: {trackStatusData['nextChangeTime']}")
         return trackStatusData
 
     """
