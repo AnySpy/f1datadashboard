@@ -148,7 +148,7 @@ class DBhandler:
         # fetchone() returns a tuple like (1,) -- return the number inside it
         return sessionID[0]
 
-    def _calculateTotalSessionTime(session: Session) -> float:
+    def _calculateTotalSessionTime(self, session: Session) -> float:
         """ 
         Args:
             session_id (int): _session id of race to calculate total time_
@@ -170,12 +170,12 @@ class DBhandler:
         print(f"{session.name} total session time = {raceDuration}")
         return raceDuration
     
-    def _setSessionTotalTime():
+    def _setSessionTotalTime(self):
         """
         _This function needs to be able to set if not set each session time in the session table with the proper session time_
         """
         print("setting total time of sessions")
-    def getSessionTime(self, session_id: int):
+    def getSessionTime(self, session_id: int) -> float | None:
         """_summary_ sends the race duration of specified session to the playControlsVM
 
         Args:
@@ -188,6 +188,11 @@ class DBhandler:
         # testing print statement
         print(f"dbhandler.py/getSessionTime: attempting to find session time at session{session_id}")
         sessionDF = self.getDataFromTable(tableName= "sessions", searchBy = "first_entry", searchData= session_id, attributeNameTuple= ("total_time",), sessionID= session_id)
+
+        # ! sessionDF being None is causing a CTD. This should be handled elegantly in the future.
+        if sessionDF is None:
+            return None
+
         # convert DF to float | just take the first value from the tuple
         sessionTime: float = sessionDF[0]
         return sessionTime
@@ -316,7 +321,7 @@ class DBhandler:
         trackTableData: tuple | None
         if currentIndex == -1:
             # pull data via approxTime (nearest entry at or before it)
-            trackTableData = self._getDataFromTable(
+            trackTableData = self.getDataFromTable(
                 tableName="trackStatus",
                 searchBy="time",
                 searchData=approxTime,
@@ -325,7 +330,7 @@ class DBhandler:
             )
         else:
             # pull data via entry_id
-            trackTableData = self._getDataFromTable(
+            trackTableData = self.getDataFromTable(
                 tableName="trackStatus",
                 searchBy="entry_id",
                 searchData=currentIndex,

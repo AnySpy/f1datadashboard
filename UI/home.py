@@ -109,7 +109,7 @@ class PlayControlsUI(Card):
 
 # on UI element change call viewModel.set{action} then have the set action updated a signal that the UI reads
 
-    def onClickPlay():
+    def onClickPlay(self):
         print("user clicked play/pause")
 
     def _onSliderPressed(self):
@@ -125,7 +125,7 @@ class PlayControlsUI(Card):
         # take time that slider displays then set the currentTime in the playControls VM
         self.playControlsVM.setCurrentTime(self.scrubSlider.value())
 
-    def onPlaybackSpeedChanged():
+    def onPlaybackSpeedChanged(self):
         print("playback speed changed")
         #change playback speed
 
@@ -218,13 +218,13 @@ class SessionSelector(Card):
         layout.addWidget(self.yearSelector)
         layout.addWidget(self.sessionSelector)
 
-    def setAvailableYears():
+    def setAvailableYears(self):
         """
         grabs available years from fastf1 api call
         if sys.currentyear > most recent year in db then call fastf1 api to get new data
         """
         print("change years available for selection")
-    def setAvailableSessions():
+    def setAvailableSessions(self):
         """
         once yearSelector is chosen ask fastf1 api 
         """
