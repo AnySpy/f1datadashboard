@@ -259,9 +259,7 @@ class DriverProfilesViewModel(QObject):
 
 
 def _main():
-    dbhandler = DBhandler()
-
-    vm_test = DriverProfilesViewModel(dbhandler)
+    vm_test = DriverProfilesViewModel()
     data = vm_test.get_driver_codes()
     print(data)
     data = vm_test.get_driver_names()

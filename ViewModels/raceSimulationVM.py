@@ -163,9 +163,14 @@ class PlayControlsVM(QObject):
         """
         query lap 1 
         """
-        totalDuration: float = self.dbhandler.getSessionTime(sessionID)
+        totalDuration = self.dbhandler.getSessionTime(sessionID)
+
         # might need to handle if the value is None
+        if totalDuration is None:
+            return 0.0
+        
         self.setRaceDuration(totalDuration)
+        return totalDuration
 
     def setRaceDuration(self, newDuration: float):
         print(f"raceSimulationVM.py/PlayControlsVM/setRaceDuration: attempting to set new duration to {newDuration}")

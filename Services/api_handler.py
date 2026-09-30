@@ -1,6 +1,6 @@
 # Imports
 import fastf1
-import database as db
+import Services.database as db
 import pandas as pd
 from fastf1.events import EventSchedule
 import typing
