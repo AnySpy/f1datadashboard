@@ -21,6 +21,9 @@ gridMargin: int = 12
 """
     TODO: 
     - write documentation for each class
+    - move the scrubber to its own class
+    - might make a vm for the scrubber 
+    - flags to show visually on scrubber (race start, trackstatus changes, finish flag)
 """
 
 
@@ -77,6 +80,16 @@ class TrackStatusCard(Card):
 
 
 class PlayControlsUI(Card):
+    """ _Front-end for the PlayControls VM. this controls the user input for toggling play, scrubbing, and playback speed_
+
+    Args:
+        Card (_QFrame_): _description_
+
+    Methods:
+        onClickPlay: _Toggle play/pause_
+        onPlayBackSpeedChange: _Change the playback speed up to 4x_
+        _
+    """
     def __init__(self, playControlsController: PlayControlsVM):
         super().__init__()
         self.playControlsVM = playControlsController
@@ -106,6 +119,11 @@ class PlayControlsUI(Card):
         scrubRow.addWidget(self.scrubSlider)
         scrubRow.addWidget(self.durationLabel)
         layout.addLayout(scrubRow)
+        # play functions
+
+        # toggle play button
+
+        # change playback speed
 
 # on UI element change call viewModel.set{action} then have the set action updated a signal that the UI reads
 
@@ -121,7 +139,6 @@ class PlayControlsUI(Card):
         self.playControlsVM.timer.blockSignals(False)
         self.sliderInUse = False
     def _onSliderValueChanged(self):
-        print("slider moved")
         # take time that slider displays then set the currentTime in the playControls VM
         self.playControlsVM.setCurrentTime(self.scrubSlider.value())
 
@@ -174,7 +191,6 @@ class HomePage(QWidget):
         gridLayout.addWidget(driverTelemetryCard1, 4, 0, 1, 4)
         driverTelemetryCard2 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
-        self.monitorTrackStatus.fetchSafetyStatus(searchData= 1, searchBy="entry_id")
         self.playControlsController.fetchRaceDuration(self.currentSessionID)
 
 

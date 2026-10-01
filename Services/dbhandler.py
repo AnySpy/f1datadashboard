@@ -128,6 +128,7 @@ class DBhandler:
                 raise ValueError(f"unknown column '{column}' for table {tableName}")
         print("dbhandler.py/_checkNames: Valid access to tables within database")
 
+    # NOTE: Flagged for Depreciation
     def getSessionID(self, tableName: str, searchIndex: int) -> int:
         """
         _summary_: get the session_id of one row, looked up by entry_id
@@ -261,7 +262,7 @@ class DBhandler:
 
         results = cursor.fetchone()
         if results is None:
-            print(f"dbhandler.py/getDataFromTable: No data found at {searchData}")
+            print(f"dbhandler.py/getDataFromTable: No data found for {attributes} at {searchBy}: {searchData} within {tableName}")
             return None
         # return data from dbQuery to the function that needs it
         # NOTE: might be nice to return a dictionary so that it is easier to read from
