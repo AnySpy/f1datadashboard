@@ -30,10 +30,8 @@ class TrackStatusVM(QObject):
         self.currentSessionId: int = 1
         # NOTE: flagged for depreciation once playcontrolsVM updates all viewModels
         self.currentTime: float = 0.00
-        self.lastStatusChangeTime: float | None = 0.00
-        self.nextStatusChangeTime: float | None = 0.00
-
-        # share the location of the playcontrols vm 
+        self.lastStatusChangeTime: float | None = 0.0
+        self.nextStatusChangeTime: float | None = 0.0
         self.playControlsVM = playControlsVM
         # on playcontrol _tick for clock run _onCurrentTimeChange function
         self.playControlsVM.updatedTime.connect(self._onCurrentTimeChange)
@@ -100,9 +98,22 @@ class TrackStatusVM(QObject):
         # fetch status from DB
         #creates a tuple to search through
         newStatus = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= searchBy, searchData= searchData, attributeNameTuple= columns, sessionID= self.currentSessionId)
-        #if newStatus == None then it is at the beginning of the track and session time != 1st track status row so set the data to Idle
-        print(f"trackStatusVM.py/TrackStatusVM/fetchSafetyStatus: newStatus that has been fetched from db: \n {newStatus}")
+
+        # ! newStatus being None is causing a CTD. This needs to be handled elegantly in the future.
+        if newStatus is None:
+            return None
+
+        """
+
+        NOTE: Believe the _getNextStatusChange fixes below issue
         # stub value need to wright a try except block for getting data from db
+        #grab next change time from table status
+        nextChangeTuple = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= "entry_id", searchData=newStatus[0] + 1, attributeNameTuple= ("time", ), sessionID= self.currentSessionId)
+
+        
+        if nextChangeTuple is None:
+            return None
+        """
         # set data to idle
         if(newStatus == None):
             self.setSafetyStatus("Idle")

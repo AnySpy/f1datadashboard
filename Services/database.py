@@ -370,8 +370,19 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
             Dataframe loaded by session.track_status:
             {Time: datetime.timedelta, Status: str, Message: str}
         """
-        timeStampInSeconds = row.get("Time").total_seconds()
-        statusNumCode = int(row.get("Status"))
+        timeStampRow = row.get("Time")
+
+        # ! timeStampRow being None needs to be handled elegantly
+        assert timeStampRow is not None
+
+        timeStampInSeconds = timeStampRow.total_seconds()
+
+        statusNumRow = row.get("Status")
+
+        # ! statusNumRow being None needs to be handled elegantly
+        assert statusNumRow is not None
+        
+        statusNumCode = int(statusNumRow)
         message = str(row.get("Message"))
 
         cur.execute(

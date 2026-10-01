@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame
 from PySide6.QtGui import QPalette, Qt
@@ -17,6 +18,8 @@ from ViewModels.trackStatusVM import TrackStatusVM
 
 # import dbhandler
 from Services.dbhandler import DBhandler
+from Services.database import create_schema
+from Services.api_handler import get_race
 
 """
 Global Vars
@@ -131,6 +134,12 @@ class Sidebar(QFrame):
 
 def _main():
     app = QApplication(sys.argv)
+
+    # ! The app will not load without this. It needs to have a race loaded into the DB or everything breaks.
+    if not Path("./f1_data.db"):
+        create_schema()
+        get_race(2026, "Japanese Grand Prix", "R")
+    
     window = MainWindow()
     window.resize(700, 300)
     window.show()
