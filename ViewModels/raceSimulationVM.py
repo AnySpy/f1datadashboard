@@ -93,7 +93,7 @@ class PlayControlsVM(QObject):
     """_summary_
 
     Args:
-        QObject (_type_): _description_
+        QObject: _this just allows use of Signals_
     Methods:
         Skip forward and back
         Play/ Pause

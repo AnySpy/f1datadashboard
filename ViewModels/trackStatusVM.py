@@ -1,4 +1,4 @@
-from PySide6.QtCore import QObject, Signal, QTimer
+from PySide6.QtCore import QObject, Signal
 from Services.dbhandler import DBhandler
 from ViewModels.raceSimulationVM import PlayControlsVM
 class TrackStatusVM(QObject):
@@ -10,8 +10,8 @@ class TrackStatusVM(QObject):
     """
 
     # Signals
-    __updatedTrackSafety = Signal(str)  # normal, yellow flag, red flag
-    __updatedTrackSurface = Signal(str)  # normal, damp, hot, etc.
+    __updatedTrackSafety = Signal(str)  
+    __updatedTrackSurface = Signal(str)  
 
     @property
     def updatedTrackSafety(self):
@@ -24,18 +24,20 @@ class TrackStatusVM(QObject):
     def __init__(self, playControlsVM: PlayControlsVM):
         super().__init__()
         # on init set Signals and class vars to normal
-        self.currentTrackSafety = "normal"
+        self.currentTrackSafety: str = "session data not loaded..."
         self.currentTrackSurface = "normal"
-        self.currentIndex = 1
+        self.currentIndex: int = 1
         self.currentSessionId: int = 1
         # NOTE: flagged for depreciation once playcontrolsVM updates all viewModels
         self.currentTime: float = 0.00
-        self.lastStatusChangeTime: float | None
-        self.nextStatusChangeTime: float | None
+        self.lastStatusChangeTime: float | None = 0.00
+        self.nextStatusChangeTime: float | None = 0.00
+
+        # share the location of the playcontrols vm 
         self.playControlsVM = playControlsVM
+        # on playcontrol _tick for clock run _onCurrentTimeChange function
         self.playControlsVM.updatedTime.connect(self._onCurrentTimeChange)
-        # self.updatedTrackSurface.emit(self.currentTrackSurface)
-        # self.updatedTrackSafety.emit(self.currentTrackSafety)
+
         # create a new DBhandler for fetching track info
         """
             NOTE: Read only
@@ -44,16 +46,21 @@ class TrackStatusVM(QObject):
         # fetch status codes from DB on creation
 
     def _onCurrentTimeChange(self, newCurrentTime):
-        print(f"trackStatusVM.py/TrackStatusVM/_onCurrentTimeChange: Received Signal from playControlsVM updatedTime: {newCurrentTime}, nextStatusChangeTime: {self.nextStatusChangeTime}")
         # if newCurrentTime < self.lastStatusChangeTime then the scrubber has been used to go back in time
-        if(newCurrentTime < self.lastStatusChangeTime):
+        if((newCurrentTime < self.lastStatusChangeTime) or (newCurrentTime >= self.nextStatusChangeTime)):
             # fetch safety status based off of time
+            print(f"trackStatusVM.py/TrackStatusVM/_onCurrentTimeChange: Fetch status via time newCurrentTime: {newCurrentTime}, lastStatusChangeTime: {self.lastStatusChangeTime}")
             self.fetchSafetyStatus(searchData= newCurrentTime, searchBy= "time")
-        if(newCurrentTime >= self.nextStatusChangeTime):
-            # fetch based off of index need to search based off of index prob not entry_id
-            # ? NOTE: if we delete sessions from the db to alow users to save space this will prob need to change to reflect indexes not entry_id
-            self.fetchSafetyStatus(searchData= self.currentIndex, searchBy="entry_id")
+            # realistically I should search by time. If the person searches via entry_id but they are not at the next entry then time is more acurate. It would basically have to update multiple times
 
+    def _getNextChangeTime(self, entryID):
+        row = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy="entry_id", searchData= entryID + 1, attributeNameTuple=("time",), sessionID= self.currentSessionId)
+        if(row != None):
+            # next change time for track status
+            return row[0]
+        else:
+            # no more trackStatus changes within the session
+            return float("inf")
     def setSurfaceStatus(self, newStatus: str):
         # this could affect 2 views in the Front end so may add a Signal
         if newStatus != self.currentTrackSurface:
@@ -83,6 +90,7 @@ class TrackStatusVM(QObject):
         return self.currentTrackSurface
 
     #  approxTime: float = 0.00, currentSessionID: int = 1, currentIndex: int = -1, endFlag: bool = False
+    # NOTE: Bug where on first load can't find any data for the newStatus
     def fetchSafetyStatus(self, searchData, searchBy):
         """_grabs data from the dbHandler and calls to set the safety status_
         NOTE: This should run checks and run getDataFromTable
@@ -90,22 +98,25 @@ class TrackStatusVM(QObject):
         #data needed from trackStatus Table
         columns = ("entry_id", "session_id", "time", "track_safety_status", "message")
         # fetch status from DB
-        """
-        newStatus = self.dbHandler.getTrackSafetyStatus(
-            approxTime= self.currentTime, currentSessionID= self.currentSessionId, currentIndex = self.currentIndex, endFlag=False
-        )
-        """
         #creates a tuple to search through
-        print(f"trackStatusVM.py/TrackStatusVM/fetchSafetyStatus trying to fetch track status from db")
         newStatus = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= searchBy, searchData= searchData, attributeNameTuple= columns, sessionID= self.currentSessionId)
+        #if newStatus == None then it is at the beginning of the track and session time != 1st track status row so set the data to Idle
+        print(f"trackStatusVM.py/TrackStatusVM/fetchSafetyStatus: newStatus that has been fetched from db: \n {newStatus}")
         # stub value need to wright a try except block for getting data from db
-        #grab next change time from table status
-        nextChangeTuple = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= "entry_id", searchData=newStatus[0] + 1, attributeNameTuple= ("time", ), sessionID= self.currentSessionId)
-        print(f"trackStatusVM.py/TrackStatusVM/fetchSafetyStatus: newStatus: {newStatus}, nextChangeTuple: {nextChangeTuple}")
-        self.lastStatusChangeTime = newStatus[2]
-        self.nextStatusChangeTime = nextChangeTuple[0]
-        self.setSafetyStatus(newStatus[4])
-        self.currentIndex += self.currentIndex
+        # set data to idle
+        if(newStatus == None):
+            self.setSafetyStatus("Idle")
+            self.lastStatusChangeTime = 0.00
+            # NOTE: find first index of session | write a function to find this 
+            self.currentIndex = 0 # start fo session 
+            self.nextStatusChangeTime = self._getNextChangeTime(self.currentIndex)
+        else:
+            #grab next change time from table status
+            self.currentIndex = newStatus[0]
+            self.nextStatusChangeTime = self._getNextChangeTime(self.currentIndex)
+            self.lastStatusChangeTime = newStatus[2]
+            self.setSafetyStatus(newStatus[4])
+            self.currentIndex += self.currentIndex
 
     
     def fetchSurfaceStatus(self):

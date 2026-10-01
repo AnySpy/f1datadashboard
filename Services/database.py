@@ -51,11 +51,26 @@ def calculateTotalSessionTime(session: Session) -> float:
         # can I just pass the memory location so I don't have to load it again
         # this makes a new DF
         newSessionStatus = session.session_status
-        startFlag = newSessionStatus.loc[newSessionStatus["Status"] == "Started", "Time"].iloc[0]
-        endFlag = newSessionStatus.loc[newSessionStatus["Status"] == "Finished", "Time"].iloc[-1]
-        raceDuration = (endFlag - startFlag).total_seconds()
-        print(f"{session.name} total session time = {raceDuration}")
-        return(raceDuration)
+        print(newSessionStatus)
+        # this is when the start flag is raised so when drivers start racing 
+        # NOTE: This will need to be sent to trackStatus and PlayControls VMs to insure proper alignment
+        # NOTE: will need to handle an error that comes up when status doesn't have a 'Ends' signal 
+        dataStreamStart = (newSessionStatus.loc[newSessionStatus["Status"] == "Inactive", "Time"]).iloc[0].total_seconds()
+        dataStreamEnd = (newSessionStatus.loc[newSessionStatus["Status"] == "Ends", "Time"]).iloc[0].total_seconds()
+        sessionStartTime = (newSessionStatus.loc[newSessionStatus["Status"] == "Started", "Time"]).iloc[0].total_seconds()
+        # this is when the positions are finalized I believe this is the last person to come in
+        # NOTE: this will need to be sent to playcontrols VM
+        sessionEndTime = (newSessionStatus.loc[newSessionStatus["Status"] == "Finalised", "Time"]).iloc[0].total_seconds()
+        totalSessionTime = sessionEndTime - sessionStartTime
+        totalDataStreamTime = dataStreamEnd - dataStreamStart
+        totalTimePerDriver = session.laps.groupby("Driver")["LapTime"].sum()
+        maxTime = totalTimePerDriver.max()
+        raceDurationByLapTimes = maxTime.total_seconds()
+
+        print(f"{session.name} total data stream time = {totalDataStreamTime}")
+        print(f"{session.name} total race time according to session time = {totalSessionTime}")
+        print(f"{session.name} total race time according to lap times = {raceDurationByLapTimes}")
+        return(totalDataStreamTime)
 
 # %% [2] CREATE THE DATABASE SCHEMA ------------------------------------------
 def create_schema(db_path: str = DB_PATH) -> None:
@@ -102,6 +117,7 @@ def create_schema(db_path: str = DB_PATH) -> None:
         driver TEXT,
         team TEXT,
         lap_number INTEGER,
+        lap_completion_timestamp,
         lap_time_seconds REAL,
         compound TEXT,
         tyre_life INTEGER,
@@ -186,6 +202,7 @@ def create_schema(db_path: str = DB_PATH) -> None:
     # finish_position = where they crossed the line (every driver gets one);
     # classified_position = the official result: a number, or "R" retired,
     # "D" disqualified, etc. status = "Finished", "Lapped", "Retired", ...
+    # ? NOTE: Do we want to add a column totalRace Time 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS results (
         session_id INTEGER NOT NULL,
@@ -302,6 +319,8 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
     # Insert laps
     for _, row in laps.iterrows():
         lap_time = row["LapTime"].total_seconds() if pd.notna(row["LapTime"]) else None
+        # NOTE: timedelta doesn't provide the data I need remove before commit
+        lap_timedelta_str: str = str(row["LapTime"])
         is_pit = (
             1
             if (pd.notna(row.get("PitInTime")) or pd.notna(row.get("PitOutTime")))
@@ -309,15 +328,16 @@ def load_session_into_db(session: Session, db_path: str = DB_PATH) -> None:
         )
         cur.execute(
             """
-            INSERT INTO laps (session_id, driver, team, lap_number, lap_time_seconds,
+            INSERT INTO laps (session_id, driver, team, lap_number, lap_completion_timestamp, lap_time_seconds,
                                compound, tyre_life, track_status, is_pit_lap, position)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 session_id,
                 row.get("Driver"),
                 row.get("Team"),
                 row.get("LapNumber"),
+                lap_timedelta_str,
                 lap_time,
                 row.get("Compound"),
                 row.get("TyreLife"),
@@ -390,7 +410,7 @@ def _preview_db(db_path: str = DB_PATH):
         pd.read_sql("SELECT * FROM results ORDER BY session_id, finish_position", conn)
     )
     print("\n --- Sample trackStatus ---")
-    print(pd.read_sql("SELECT * FROM trackStatus LIMIT 5", conn))
+    print(pd.read_sql("SELECT * FROM trackStatus", conn))
     conn.close()
 
 
