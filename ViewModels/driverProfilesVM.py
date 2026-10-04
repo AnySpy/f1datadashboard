@@ -26,7 +26,7 @@ class ImageWorker(QRunnable):
         pixmap = QPixmap()
         if not (image_bytes and pixmap.loadFromData(QByteArray(image_bytes))):
             # TODO: Replace this with a generic "Driver Not Found" image later
-            pixmap = QPixmap("images/sample_driver.jpg")
+            pixmap = QPixmap("images/Driver_Not_found.jpg")
 
         scaled = pixmap.scaled(
             self.size, self.size,
@@ -65,6 +65,7 @@ class DriverProfilesViewModel(QObject):
 
     """
 
+    # ? Private signals and properties to read those signals externally
     __stats_loaded = Signal(dict)
     __bio_loaded = Signal(str)
     __name_loaded = Signal(str)
@@ -102,14 +103,7 @@ class DriverProfilesViewModel(QObject):
         # ? Initializing this here in case we need to remember this data between state changes. It'd be easy to remove this later if we want to.
         self.current_stats: dict[str, str] = {}
 
-    def _get_known_drivers(self) -> dict[str, str]:
-        """Helper function for `get_driver_names()` and `get_driver_codes()`
-
-        Returns:
-            dict[str, str]: A dictionary with the driver codes as keys and the driver names as values (e.g. {'VER': 'Max Verstappen'})
-        """
-        return self.dbhandler.getKnownDrivers()
-
+    # Methods to be used externally
     def get_driver_names(self) -> list[str]:
         """Gets a list of all known driver names
 
@@ -140,7 +134,7 @@ class DriverProfilesViewModel(QObject):
             str: The biography of the driver
         """
         return self.scraper.fetch_driver_bio(soup)
-
+    
     def get_formatted_placements(
         self, placement_history: list[int], location_history: list[str]
     ) -> list[tuple[str, str]]:
@@ -159,38 +153,6 @@ class DriverProfilesViewModel(QObject):
             formatted_cards.append((formatted_place, location))
 
         return formatted_cards
-
-    def _format_placement(self, place: int) -> str:
-        """Helper function: called by `get_formatted_placements()`"""
-        match place:
-            case 1:
-                placement_string = "1st"
-            case 2:
-                placement_string = "2nd"
-            case 3:
-                placement_string = "3rd"
-            case _:
-                placement_string = f"{place}th"
-        return placement_string
-
-    def _load_driver_stats(self, soup: BeautifulSoup, scope: str) -> dict[str, str]:
-        """Loads the driver stats from the F1 website
-
-        Args:
-            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
-            scope (str): Whether to use the scope of "season" or "career" for stats.
-
-        Returns:
-            dict[str, str]: The stats returned in a pairing of "Title": "Value"
-        """
-        data = self.scraper.fetch_driver_stats(soup)
-
-        if not data:
-            return {"ERROR": "Data Unavailable"}
-
-        self.current_stats = data[scope]
-
-        return self.current_stats
 
     def get_season_stats(self, soup: BeautifulSoup) -> dict[str, str]:
         """Returns the given driver's season stats
@@ -229,10 +191,15 @@ class DriverProfilesViewModel(QObject):
 
         soup = self.scraper.get_soup(driver_name)
 
-        assert soup is not None # TODO: Find a way to fail elegantly
+        if soup is None:
+            self.stats_changed.emit({"Status": "No Stats Available"})
+            self.bio_changed.emit("Biography Not Available")
+            # ? I'm displaying this as is because it could be useful for debugging why a page didn't return (since it's equivalent to what we pass to get_soup())
+            self.name_changed.emit(_driver_display_name)
+            raise ValueError(f"Driver not found: {driver_name}. Showing default values")
 
         career_stats = self.get_career_stats(soup)
-        bio_text = self.get_driver_bio(soup)\
+        bio_text = self.get_driver_bio(soup)
 
         if not career_stats:
             career_stats = {"Status": "No Stats Available"}
@@ -247,16 +214,47 @@ class DriverProfilesViewModel(QObject):
         worker.signals.finished_signal.connect(self.img_changed.emit)
 
         self.thread_pool.start(worker)
+    
+    # Helper Methods
+    def _get_known_drivers(self) -> dict[str, str]:
+        """Helper function for `get_driver_names()` and `get_driver_codes()`
 
-    def setActiveDriver(self):
-        # stub
-        return 0
+        Returns:
+            dict[str, str]: A dictionary with the driver codes as keys and the driver names as values (e.g. {'VER': 'Max Verstappen'})
+        """
+        return self.dbhandler.getKnownDrivers()
 
-    # dataType historical, seasonData, teamData
-    def fetchDriverData(self, session: str):
-        # stub
-        return 0
+    def _format_placement(self, place: int) -> str:
+        """Helper function: called by `get_formatted_placements()`"""
+        match place:
+            case 1:
+                placement_string = "1st"
+            case 2:
+                placement_string = "2nd"
+            case 3:
+                placement_string = "3rd"
+            case _:
+                placement_string = f"{place}th"
+        return placement_string
 
+    def _load_driver_stats(self, soup: BeautifulSoup, scope: str) -> dict[str, str]:
+        """Loads the driver stats from the F1 website
+
+        Args:
+            soup (BeautifulSoup): A BeautifulSoup object that contains the text of the webpage. Can be obtained by calling get_soup() on a DriverStatScraper object.
+            scope (str): Whether to use the scope of "season" or "career" for stats.
+
+        Returns:
+            dict[str, str]: The stats returned in a pairing of "Title": "Value"
+        """
+        data = self.scraper.fetch_driver_stats(soup)
+
+        if not data:
+            return {"ERROR": "Data Unavailable"}
+
+        self.current_stats = data[scope]
+
+        return self.current_stats
 
 def _main():
     vm_test = DriverProfilesViewModel()
@@ -266,7 +264,6 @@ def _main():
     print(data)
 
     return 0
-
 
 if __name__ == "__main__":
     _main()
