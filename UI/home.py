@@ -28,16 +28,14 @@ gridMargin: int = 12
 
 
 class Card(QFrame):
-    """_summary_
-
-    Args:
-        QFrame (QWidget): _generates a basic layout for each other card_
+    """
+    _Class that will provide the basic styling for each object on the homepage_
     """
 
     def __init__(self):
         super().__init__()
         self.setStyleSheet(
-            f"""
+        f"""
                 background-color: {layoutColor};
                 border-radius: 12px;        
         """
@@ -45,21 +43,23 @@ class Card(QFrame):
 
 
 class DriverCard(QFrame):
+    """
+    _UI element for the driver data being held within the driver placments area of the homepage_
+
+    """
     def __init__(self, driverName, currentPlacement):
         super().__init__()
 
 
 class TrackStatusCard(Card):
-    """_creates a card that shows updated data from the VM_
+    """_creates a card that shows updated data from the trackStatusVM_
 
-    Args:
-        Card (QFrame): _description_
     """
 
     def __init__(self, trackStatusVM: TrackStatusVM):
         super().__init__()
         self.setStyleSheet(f"""background-color: {theme.background}""")
-        # create an instance of the VM
+        # share the mem location of the initialized VM
         self.trackStatusVM = trackStatusVM
         # stub info while waiting for race to load
         self.message: str = "No Data Loaded..."
@@ -67,14 +67,19 @@ class TrackStatusCard(Card):
         layout = QHBoxLayout(self)
         # create the label that will be updated
         self.statusLabel = QLabel(self.message)
+
         layout.addWidget(self.statusLabel)
 
         # connect to the VM
         self.trackStatusVM.updatedTrackSafety.connect(self.onStatusChange)
 
     def onStatusChange(self, status: str):
-        print("status changed")
-        print(status)
+        """_function that is called everytime the status is updated from the trackStatusVM_
+
+        Args:
+            status (str): _This is the track status that was sent from the trackStatusVM_
+        """
+        # set local message to the new status then update the label
         self.message = status
         self.statusLabel.setText(self.message)
 
@@ -83,12 +88,13 @@ class PlayControlsUI(Card):
     """ _Front-end for the PlayControls VM. this controls the user input for toggling play, scrubbing, and playback speed_
 
     Args:
-        Card (_QFrame_): _description_
+        Card: _basic styling_
 
     Methods:
         onClickPlay: _Toggle play/pause_
         onPlayBackSpeedChange: _Change the playback speed up to 4x_
-        _
+        onCurrentTimeChange: _when the playControlsVM's timer updates it runs this code block_
+        onDurationChange: _when the playCotnrolsVM's sessionDuration changes it runs this code block, this will fire when the session is changed_
     """
     def __init__(self, playControlsController: PlayControlsVM):
         super().__init__()
@@ -128,38 +134,62 @@ class PlayControlsUI(Card):
 # on UI element change call viewModel.set{action} then have the set action updated a signal that the UI reads
 
     def onClickPlay(self):
+        """_send a signal to the playcontrolVM to stop the clock_
+
+        """
         print("user clicked play/pause")
 
     def _onSliderPressed(self):
+        """_stop the playControls timer from updating the timer while the user is messing with the slider_
+        
+        """
         # stop the slider from updating from currentTime changing
         self.playControlsVM.timer.blockSignals(True)
         self.sliderInUse = True
     def _onSliderReleased(self):
+        """_unblock the playcontrols timer from updating_
+        """
         # allow the slider to update from currentTime changing
         self.playControlsVM.timer.blockSignals(False)
         self.sliderInUse = False
     def _onSliderValueChanged(self):
+        """_set the playcontrolVM's timer to what the new value is_
+        """
         # take time that slider displays then set the currentTime in the playControls VM
         self.playControlsVM.setCurrentTime(self.scrubSlider.value())
 
     def onPlaybackSpeedChanged(self):
+        """_update the playControlsVM's variable for the playback speed to the new value up to 4x_
+        """
         print("playback speed changed")
         #change playback speed
 
-    def _formatTime(self, totalSeconds: float):
+    def _formatTime(self, totalSeconds: float) -> str:
+        """ _Takes the arguement and converts it into a str that can be passed easily to the QLabel_
+
+        Args:
+            totalSeconds (float): _the total seconds that need to be converted to a string_
+
+        Returns:
+            str: _formatted HH:MM:SS str value_
+        """
+        # round the total sescods into an easy to work with numbe
         totalSeconds = int(round(totalSeconds))
+        # find the separate values for HH:MM:SS
         hours = totalSeconds // 3600
         minutes = (totalSeconds % 3600) // 60
         seconds = totalSeconds % 60
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
    
     def onCurrentTimeChange(self, newCurrentTime):
-        #self.scrubSlider.blockSignals(True)
+        """_when current time changes from the playControlsVM's timer set the new current time to what it was just updated to _
+
+        Args:
+            newCurrentTime (_float_): _new time emitted by a signal within the playcontrolVM object_
+        """
         time = self._formatTime(newCurrentTime)
         self.currentTimeLabel.setText(time)
-        #self.scrubSlider.blockSignals(False)
-        # update slider if not being dragged
-   
+
     def onDurationChange(self, newDuration):
         #self.scrubSlider.blockSignals(True)
         self.raceDuration = newDuration
@@ -169,10 +199,15 @@ class PlayControlsUI(Card):
         #self.scrubSlider.blockSignals(False)
 
 class HomePage(QWidget):
+    """_Home page UI layout, instantiates different UI objects and places them on the homepage widget_
+
+    """
     def __init__(self, trackStatusViewModel: TrackStatusVM, playControlsViewModel):
         super().__init__()
+        # share the mem location of VMs
         self.monitorTrackStatus = trackStatusViewModel
         self.playControlsController = playControlsViewModel
+        # NOTE: hard coded, in future this should be held within sessionSelectorVM
         self.currentSessionID = 1
         
         # make a grid layout of 13x11ish
@@ -180,26 +215,37 @@ class HomePage(QWidget):
         gridLayout = QGridLayout(self)
         gridLayout.setSpacing(gridMargin)
         gridLayout.setSpacing(gridMargin)
+        # setting the margins of the grid to a standard size
         gridLayout.setContentsMargins(gridMargin, gridMargin, gridMargin, gridMargin)
+        # create the simulation frame
         driverSimFrame = DriverSIM(trackStatus = self.monitorTrackStatus, playControlsController = self.playControlsController)
         gridLayout.addWidget(driverSimFrame, 1,0, 3, 3)
+        # create the session selector
         sessionFrame = SessionSelector()
         gridLayout.addWidget(sessionFrame, 0, 0, 1, 3)
+        # create the driver placement UI 
         driverStandingsFrame = DriverStandings()
         gridLayout.addWidget(driverStandingsFrame, 0, 3, 4, 1)
+        # create the focussed driver telemetry card
         driverTelemetryCard1 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard1, 4, 0, 1, 4)
+        # create the 2nd focussed driver telemetry card
         driverTelemetryCard2 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
+        # NOTE: this should not control this, make playControls fetch this on init call the playControlsVM to fetch the race duration
         self.playControlsController.fetchRaceDuration(self.currentSessionID)
 
 
 class DriverSIM(Card):
+    """
+    _UI for the visual race simulation where the drivers are placed on a graph and have their live gps data transmitted to move their vehicles_
+    """
     def __init__(self, trackStatus: TrackStatusVM, playControlsController: PlayControlsVM):
         super().__init__()
         layout = QVBoxLayout(self)
         # create the track status card that will sit inside of the race sim
         self.trackStatusCard = TrackStatusCard(trackStatus)
+        # create the playcontrols that will sit at the bottom row of the race sim
         self.playControlsUI = PlayControlsUI(playControlsController)
         layout.addWidget(self.trackStatusCard)
         # this will hold the simulated race
@@ -208,27 +254,41 @@ class DriverSIM(Card):
 
 
 class DriverStandings(Card):
+    """
+    _this holds all of the Driver Cards for a specified race_
+    """
     def __init__(self):
         super().__init__()
+        # create and add a label for layout purposes
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Driver Standings"))
 
 
 class DriverTelemetry(Card):
+    """
+    _showcase the focussed driver's live telemetry_
+    """
     def __init__(self):
         super().__init__()
         self.setMaximumHeight(100)
+        # create and add a label for layout purposes
         layout = QHBoxLayout(self)
         layout.addWidget(QLabel("Driver Telemetry"))
 
 
 class SessionSelector(Card):
+    """
+    _UI element that creates a few dropdown menus and submit button so the user can change sessions_
+    """
     def __init__(self):
         super().__init__()
         self.setMaximumHeight(50)
+        # create and add a label for layout purposes
         layout = QHBoxLayout(self)
         layout.addWidget(QLabel("SessionSelector"))
+        # year dropdown menu
         self.yearSelector = QComboBox()
+        # seesion dropdown menu
         self.sessionSelector = QComboBox()
 
         layout.addWidget(self.yearSelector)
