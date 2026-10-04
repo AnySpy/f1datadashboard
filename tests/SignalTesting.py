@@ -20,17 +20,17 @@ class testTrackStatusSignal:
         self.numTestsPassed: int = 0
         self.totalNumTests: int = 3
 
-    def testSignalChanges():
+    def testSignalChanges(self):
         works: bool = False
         # stub
         return works
 
-    def testCorrectVal():
+    def testCorrectVal(self):
         works: bool = False
         # stub
         return works
 
-    def testSignalHandler():
+    def testSignalHandler(self):
         works: bool = False
         # stub
         return works

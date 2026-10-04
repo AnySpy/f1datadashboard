@@ -141,7 +141,7 @@ class DriverAboutSection(QWidget):
         bio = QVBoxLayout()
 
         self.image_holder = QLabel()
-        self.image_holder.setPixmap(QPixmap("images/sample_driver.jpg"))
+        self.image_holder.setPixmap(QPixmap("images/Driver_Not_found.jpg"))
         self.image_holder.setFixedSize(100, 100)
 
         self.name = QLabel("NAME")
