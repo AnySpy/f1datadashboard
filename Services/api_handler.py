@@ -36,6 +36,7 @@ def get_race(year: int, event_name: str, type: str = "R") -> None:
 # Helper/Debug Functions
 # ? If we can type hint the return to something other than "pd.Series[typing.Any] | None" I would love it forever.
 # ?     Not a priority since it's just a cosmetic change, but I'd like to figure out a different type hint that doesn't make PyLance cry.
+# NOTE: pd.Series[typing.Any] | None this is causing a bug
 def _get_event_names(schedule: EventSchedule) -> pd.Series[typing.Any] | None:
     """Helper function for getting a list of names. Scaffolded to help with frontend
 

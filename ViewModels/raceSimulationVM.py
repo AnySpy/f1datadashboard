@@ -90,7 +90,7 @@ class DriverStandingsVM(QObject):
         return 0
 
 class PlayControlsVM(QObject):
-    """_summary_
+    """_view model for the play controls ui_
 
     Args:
         QObject: _this just allows use of Signals_
@@ -111,13 +111,14 @@ class PlayControlsVM(QObject):
         - needs to be able to show current time and total time on front end
         - needs to be able to change current time
         - needs to be able to play / pause simulation
+    TODO: 
+        - change signals to private properties
     """
     updatedTime = Signal(float)
     updatedRaceDuration = Signal(float)
     # this should probably be a property of play controls it will need to listen to changes
     updatedPlayingStatus = Signal(bool)
     # used to display time on play back slider
-    # updatedFormattedTime = Signal(str)
     def __init__(self):
         super().__init__()
         self.isPlaying: bool = False
@@ -125,24 +126,31 @@ class PlayControlsVM(QObject):
         self.currentRaceDuration: float = 0.00
         # read only 
         self.dbhandler = DBhandler()
-        # load session times to the session table
-        # self.fetchRaceDuration(self.currentSessionID)
-        # slider properties
-        
         # create timer
         self.timer = QTimer(self)
         # set interval to 1000ms or 1 second smallest measurement we need
+        # NOTE: need to change this parameter to a variable so I can update playback speed
         self.timer.setInterval(1000)
+        # each update call _tick
         self.timer.timeout.connect(self._tick)
-        # test
+        # NOTE: on application start we will want to change this VM to a paused start to begin
         self.timer.start()
 
 
     def _tick(self):
+        """_helper function that calls setCurrentTime everytime the timer is incremented_
+        """
         # print(f"timer = {self.currentTime + 1}")
         self.setCurrentTime(self.currentTime + 1)
 
     def togglePlay(self, timeAtTogglePressed):
+        """_function that updates the VM state to playing or paused depending on previous state_
+
+        Args:
+            timeAtTogglePressed (_float_): _this is currently the way a scrubber will be able to change times_
+        NOTE:
+            change above timeAtTogglePressed, don't think I need it
+        """
         # if simulation is playing then pause
         if(self.isPlaying):
             self.isPlaying = False
@@ -154,14 +162,26 @@ class PlayControlsVM(QObject):
             self.updatedPlayingStatus.emit(True)
             self.timer.start()
 
-    def setCurrentTime(self, newCurrentTime):
+    def setCurrentTime(self, newCurrentTime: float):
+        """
+        _helper function that sets local current time and sends a signal to other VMs to update based off of new current time_
+
+        Args:
+            newCurrentTime (_float_): _current time in seconds_
+        """
         # make what ever is reading the data convert the convert the time to a string and update the updatedTime hour: minute: second
         self.currentTime = newCurrentTime
         self.updatedTime.emit(newCurrentTime)
         
-    def fetchRaceDuration(self, sessionID) -> float:
+    def fetchRaceDuration(self, sessionID: int = 1) -> float:
         """
-        query lap 1 
+        _grabs the current session duration from session table in database_
+
+        Args:
+            _sessionId_ (int) : the integer id of the current session being loaded into the simulation
+
+        NOTE: 
+            in future make this handle getting data via getDataFromTable
         """
         totalDuration = self.dbhandler.getSessionTime(sessionID)
 
@@ -190,8 +210,6 @@ class RaceHandler(QObject):
     """
     This will initialize all of the drivers, track info, playControls
 
-    Args:
-        QObject (_type_): _description_
     """
 
     def __init__(self):
