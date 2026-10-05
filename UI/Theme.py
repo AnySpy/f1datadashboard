@@ -13,6 +13,7 @@ class DayTheme:
     warning: str = "#fff200"
     danger: str = "#e33d3d"
     info: str = "#3e85d1"
+    safety: str = "#ff9334"
 
 
 theme = DayTheme()
