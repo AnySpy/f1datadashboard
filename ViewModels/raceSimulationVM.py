@@ -121,9 +121,10 @@ class PlayControlsVM(QObject):
     # used to display time on play back slider
     def __init__(self):
         super().__init__()
-        self.isPlaying: bool = False
+        self.__isPlaying: bool = False
         self.currentTime:float = 0.00
         self.currentRaceDuration: float = 0.00
+        self.playBackSpeed: int = 1
         # read only 
         self.dbhandler = DBhandler()
         # create timer
@@ -132,18 +133,18 @@ class PlayControlsVM(QObject):
         # NOTE: need to change this parameter to a variable so I can update playback speed
         self.timer.setInterval(1000)
         # each update call _tick
-        self.timer.timeout.connect(self._tick)
+        self.timer.timeout.connect(self.__tick)
         # NOTE: on application start we will want to change this VM to a paused start to begin
-        self.timer.start()
+        # self.timer.start()
 
 
-    def _tick(self):
+    def __tick(self):
         """_helper function that calls setCurrentTime everytime the timer is incremented_
         """
         # print(f"timer = {self.currentTime + 1}")
-        self.setCurrentTime(self.currentTime + 1)
+        self.setCurrentTime(self.currentTime + self.playBackSpeed)
 
-    def togglePlay(self, timeAtTogglePressed):
+    def togglePlay(self):
         """_function that updates the VM state to playing or paused depending on previous state_
 
         Args:
@@ -152,15 +153,19 @@ class PlayControlsVM(QObject):
             change above timeAtTogglePressed, don't think I need it
         """
         # if simulation is playing then pause
-        if(self.isPlaying):
-            self.isPlaying = False
+        if(self.__isPlaying):
+            self.__isPlaying = False
             self.updatedPlayingStatus.emit(False)
             self.timer.stop()
-            self.setCurrentTime(timeAtTogglePressed)
         else:
-            self.isPlaying = True
+            self.__isPlaying = True
             self.updatedPlayingStatus.emit(True)
             self.timer.start()
+    def getIsPlaying(self):
+        return self.__isPlaying
+    # TODO: write documentation for this and finish this code later
+    def setPlaybackSpeed(self, newPlaybackSpeed: int):
+        self.playBackSpeed = newPlaybackSpeed
 
     def setCurrentTime(self, newCurrentTime: float):
         """

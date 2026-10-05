@@ -8,6 +8,7 @@ class TrackStatusVM(QObject):
         - add currentIndex and approxTime to the vars on init
         - add logic to determine if track is wet or dry
         - refactor so that I can't directly pull the data from properties
+        - This is not properly updating the loading text on the UI after the scrubber is set back to before the race starts
     """
 
     # Signals

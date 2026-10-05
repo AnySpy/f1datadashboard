@@ -1,5 +1,5 @@
 # basic test application
-from PySide6.QtCore import Signal,Qt
+from PySide6.QtCore import Signal, Qt
 from UI.Theme import theme
 from ViewModels.raceSimulationVM import PlayControlsVM
 from ViewModels.trackStatusVM import TrackStatusVM
@@ -13,17 +13,21 @@ from PySide6.QtWidgets import (
     QFrame,
     QSlider,
     QComboBox,
+    QPushButton,
+    QStyleFactory
 )
 
 layoutColor: str = theme.info
 gridMargin: int = 12
+padding: int = 12
+borderRadius: int= 20
 
 """
     TODO: 
-    - write documentation for each class
     - move the scrubber to its own class
     - might make a vm for the scrubber 
     - flags to show visually on scrubber (race start, trackstatus changes, finish flag)
+    - comment out print debug statements
 """
 
 
@@ -36,8 +40,8 @@ class Card(QFrame):
         super().__init__()
         self.setStyleSheet(
         f"""
-                background-color: {layoutColor};
-                border-radius: 12px;        
+                background-color: {theme.background};
+                border-radius: {borderRadius};        
         """
         )
 
@@ -58,7 +62,9 @@ class TrackStatusCard(Card):
 
     def __init__(self, trackStatusVM: TrackStatusVM):
         super().__init__()
-        self.setStyleSheet(f"""background-color: {theme.background}""")
+        self.statusStyles: dict = {"AllClear": theme.success, "Yellow": theme.warning, "Red" : theme.danger, "VSCDeployed" : theme.safety}
+        #self.setStyleSheet(f"""background-color: {theme.background}""")
+        self.setMaximumHeight(50)
         # share the mem location of the initialized VM
         self.trackStatusVM = trackStatusVM
         # stub info while waiting for race to load
@@ -82,6 +88,7 @@ class TrackStatusCard(Card):
         # set local message to the new status then update the label
         self.message = status
         self.statusLabel.setText(self.message)
+        self.statusLabel.setStyleSheet(f"color: {self.statusStyles[self.message]}")
 
 
 class PlayControlsUI(Card):
@@ -98,10 +105,11 @@ class PlayControlsUI(Card):
     """
     def __init__(self, playControlsController: PlayControlsVM):
         super().__init__()
+        self.setFixedHeight(60)
         self.playControlsVM = playControlsController
         self.raceDuration: float = 0.00
         self.formattedTime: str = "00:00:00"
-
+        self.SPEEDS: tuple = (1,2,4)
         #connect on duration change to the playControlsVM
         self.playControlsVM.updatedRaceDuration.connect(self.onDurationChange)
         self.playControlsVM.updatedTime.connect(self.onCurrentTimeChange)
@@ -121,23 +129,70 @@ class PlayControlsUI(Card):
         # is slider being messed with 
         self.sliderInUse: bool = False
 
-        scrubRow.addWidget(self.currentTimeLabel)
-        scrubRow.addWidget(self.scrubSlider)
-        scrubRow.addWidget(self.durationLabel)
-        layout.addLayout(scrubRow)
         # play functions
-
+        
         # toggle play button
+        self.playButton = QPushButton()
+        self.playButton.setText("▶")
+        self.playButton.setFixedSize(40,40)
+        self.playButton.setStyleSheet(
+            f"""background-color: {theme.background};
+                color: {theme.primaryText};
+                padding: {padding};
+                border-radius: {borderRadius};
+            """
+            
+        )
+        '''
+        "QPushButton { padding: 6px 16px; border-radius: 6px;"
+        "background-color: #e10600; color: white; font-weight: bold; }"
+        "QPushButton:hover { background-color: #ff1e17; }"
+        '''
+
+        self.playButton.clicked.connect(self._onClickPlay)
+        
 
         # change playback speed
+        self.speedBox = QComboBox()
+        self.speedBox.setStyle(QStyleFactory.create("Fusion"))
+        self.speedBox.setStyleSheet(
+            f"""
+            QComboBox {{
+                color: {theme.primaryText};
+                border-radius: {borderRadius};
+                padding: 2px;
+            }}
 
+            QComboBox::drop-down {{
+                width: 14px;
+                border: none;
+            }}
+            """
+        )
+        for s in self.SPEEDS:
+            self.speedBox.addItem(f"{s}x", s)
+        self.speedBox.setCurrentIndex(self.SPEEDS.index(1))
+        self.speedBox.currentIndexChanged.connect(self._onPlaybackSpeedChanged)
+
+        scrubRow.addWidget(self.playButton, alignment= Qt.AlignmentFlag.AlignVCenter)
+        scrubRow.addWidget(self.speedBox)
+        scrubRow.addWidget(self.currentTimeLabel)
+        scrubRow.addWidget(self.scrubSlider, 1)
+        scrubRow.addWidget(self.durationLabel)
+        layout.addLayout(scrubRow)
+        
 # on UI element change call viewModel.set{action} then have the set action updated a signal that the UI reads
 
-    def onClickPlay(self):
+    def _onClickPlay(self):
         """_send a signal to the playcontrolVM to stop the clock_
 
         """
         print("user clicked play/pause")
+        self.playControlsVM.togglePlay()
+        if self.playControlsVM.getIsPlaying():
+            self.playButton.setText("⏸")
+        else:
+            self.playButton.setText("▶")
 
     def _onSliderPressed(self):
         """_stop the playControls timer from updating the timer while the user is messing with the slider_
@@ -158,10 +213,11 @@ class PlayControlsUI(Card):
         # take time that slider displays then set the currentTime in the playControls VM
         self.playControlsVM.setCurrentTime(self.scrubSlider.value())
 
-    def onPlaybackSpeedChanged(self):
+    def _onPlaybackSpeedChanged(self, index = 1):
         """_update the playControlsVM's variable for the playback speed to the new value up to 4x_
         """
-        print("playback speed changed")
+        print(f"playback speed changed to {self.speedBox.itemData(index)}")
+        self.playControlsVM.setPlaybackSpeed(self.speedBox.itemData(index))
         #change playback speed
 
     def _formatTime(self, totalSeconds: float) -> str:
@@ -242,6 +298,7 @@ class DriverSIM(Card):
     """
     def __init__(self, trackStatus: TrackStatusVM, playControlsController: PlayControlsVM):
         super().__init__()
+        # self.setStyleSheet(f"background-color: {theme.info}")
         layout = QVBoxLayout(self)
         # create the track status card that will sit inside of the race sim
         self.trackStatusCard = TrackStatusCard(trackStatus)
@@ -285,15 +342,22 @@ class SessionSelector(Card):
         self.setMaximumHeight(50)
         # create and add a label for layout purposes
         layout = QHBoxLayout(self)
-        layout.addWidget(QLabel("SessionSelector"))
+        layout.addWidget(QLabel("Current Session"))
         # year dropdown menu
+        # TODO: insure that downloaded sessions are also in a separate section
         self.yearSelector = QComboBox()
+        self.yearSelector.setPlaceholderText("Select Year")
         # seesion dropdown menu
+        # TODO: on session selected load session into view
         self.sessionSelector = QComboBox()
+        self.sessionSelector.setPlaceholderText("Select Session")
 
         layout.addWidget(self.yearSelector)
         layout.addWidget(self.sessionSelector)
 
+
+        # self.yearSelector.currentIndexChanged.connect(self.onYearChanged)
+        # self.sessionSelector.currentIndexChanged.connect(self.sessionSelectorVM.onSessionChanged)
     def setAvailableYears(self):
         """
         grabs available years from fastf1 api call
