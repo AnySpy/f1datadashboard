@@ -41,17 +41,14 @@ class MainWindow(QMainWindow):
         self.conectivityVM = ConnectivityVM()
         self.driverProfilesVM = DriverProfilesViewModel()
         self.sessionSelectorVM = SessionSelectorVM(conectivityModel= self.conectivityVM)
-        self.playControlsVM = PlayControlsVM()
-        self.trackStatusVM = TrackStatusVM(playControlsVM = self.playControlsVM)
+        self.playControlsVM = PlayControlsVM(sessionSelectorVM= self.sessionSelectorVM)
+        self.trackStatusVM = TrackStatusVM(playControlsVM = self.playControlsVM, sessionSelectorVM=self.sessionSelectorVM)
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
-        #
         # initialize all view models
-        #
         # create initialize track status view model
         # self.monitorTrackStatus = TrackStatusVM()
-
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
 

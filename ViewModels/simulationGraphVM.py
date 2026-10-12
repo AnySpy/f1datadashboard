@@ -11,6 +11,8 @@ import pandas as pd
 from UI.Theme import theme
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from ViewModels.sessionSelectorVM import SessionSelectorVM
+from Services.dbhandler import DBhandler
 
 """ 
     TODO:
@@ -21,31 +23,43 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 """
 
 class SimulationCanvas(FigureCanvasQTAgg):
-    def __init__(self):
+    def __init__(self, sessionSelectorVM : SessionSelectorVM):
+        # initialize the figure to place the simulated race
         self.figure = Figure(facecolor = theme.background)
         self.ax = self.figure.add_axes([0,0,1,1])
         self.drivers: list
+        # share memory location of the sessionSelectorVM
+        self.sessionSelectorVM = sessionSelectorVM
         super().__init__(self.figure)
+        # might remove this and just not add the axes in the previous init
+        self.dbHandler = DBhandler()
         self.ax.set_axis_off()
         self.ax.set_aspect("equal", adjustable="datalim")
         self.ax.set_facecolor("none")
+        # driver_code, {x,y datat}
         self.driverGPSPos: dict[str , pd.DataFrame] = {}
-        #self.drawTrackOutline()
         """
         for spine in self.ax.spines.values():
             spine.set_visible(False)
         """
         self.ax.margins(0.03)
+        self.sessionSelectorVM.currentSessionIDChanged.connect(self.drawTrackOutline)
         self.loadDriverGPSPos()
         #print(f" VER gps pos data frame \n {self.getDriverGPSPos(abbr = "VER")}")
+
+    def onSessionChanged(self):
+        self.loadDriverGPSPos()
 
     def getDriverGPSPos(self, abbr: str) -> pd.DataFrame | None:
         return self.driverGPSPos.get(abbr.upper()).head(5)
 
-    def loadDriverGPSPos(self, year: int = 2023, event: str = "Bahrain", sessionType: str = "R"):
-        session = fastf1.get_session(year, event, sessionType)
-        session.load(telemetry=True, laps=True, weather=False, messages=False)
+    # TODO: refactor to pull the data from the db
+    def loadDriverGPSPos(self, session_id: int):
 
+        session: pd.DataFrame
+        #session = fastf1.get_session(year, event, sessionType)
+        #session.load(telemetry=True, laps=True, weather=False, messages=False)
+        session = self.dbHandler.getDataFromTable()
         for driverNumber in session.drivers:
             abbr = session.get_driver(driverNumber)["Abbreviation"]
             laps = session.laps.pick_drivers(driverNumber)
@@ -59,7 +73,7 @@ class SimulationCanvas(FigureCanvasQTAgg):
                 # one DataFrame per driver: X, Y, Z, Status, Time, SessionTime, LapNumber, ...
                 self.driverGPSPos[abbr] = pd.concat(frames, ignore_index=True)
 
-        
+    # NOTE: refactoring to pull data from db instead
     def drawTrackOutline(self):
         # make this modular and don't load a fastf1 session every time pull data from rows in the database
         session = fastf1.get_session(2023, 'Bahrain', 'R')
