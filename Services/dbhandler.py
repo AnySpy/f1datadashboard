@@ -162,6 +162,19 @@ ALLOWED_COLUMNS: dict = {
         "points",
         "status",
     },
+    "raceControlMessages": {
+        "message_id",
+        "session_id",
+        "time",
+        "category",
+        "message",
+        "status",
+        "flag",
+        "scope",
+        "sector",
+        "racing_number",
+        "lap",
+    },
 }
 
 # Tables that have a numeric elapsed-time column (seconds) we can search by.
@@ -350,6 +363,26 @@ class DBhandler:
         )
         """)
 
+        # Race control messages — FIA/F1 messages issued during a session.
+        # Examples include yellow/green flags, safety-car notices, pit-lane
+        # messages, investigations, penalties, and other control messages.
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS raceControlMessages (
+            message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            time TEXT,
+            category TEXT,
+            message TEXT,
+            status TEXT,
+            flag TEXT,
+            scope TEXT,
+            sector INTEGER,
+            racing_number TEXT,
+            lap INTEGER,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+        )
+        """)
+
         # Results table — the official race result, one row per driver per session.
         # Feeds the "placement over time" graph (#44) and race outcome prediction (#42).
         # grid_position 0 = started from the pit lane.
@@ -395,6 +428,7 @@ class DBhandler:
         event = session.event.EventName
         # copy data from session.track_status
         trackStatusDF = session.track_status.copy()
+        raceControlDF = session.race_control_messages.copy()
         # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
         # - yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
         session_type = session.event.Session5
@@ -430,7 +464,7 @@ class DBhandler:
         # Reloading a race used to insert its laps/weather/trackStatus rows a
         # second time (those tables have no unique key). Clear this session's old
         # rows first so a reload replaces the data instead of duplicating it.
-        for table in ("laps", "weather", "trackStatus", "results"):
+        for table in ("laps", "weather", "trackStatus", "results", "raceControlMessages"):
             cur.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
 
         # Insert drivers
@@ -550,10 +584,35 @@ class DBhandler:
                 """,
                 (session_id, timeStampInSeconds, statusNumCode, message),
             )
+        # Insert race-control messages
+        for _, row in raceControlDF.iterrows():
+            cur.execute(
+                """
+                INSERT INTO raceControlMessages (
+                    session_id, time, category, message, status, flag,
+                    scope, sector, racing_number, lap
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    _to_text(row.get("Time")),
+                    _to_text(row.get("Category")),
+                    _to_text(row.get("Message")),
+                    _to_text(row.get("Status")),
+                    _to_text(row.get("Flag")),
+                    _to_text(row.get("Scope")),
+                    _to_int(row.get("Sector")),
+                    _to_text(row.get("RacingNumber")),
+                    _to_int(row.get("Lap")),
+                ),
+            )
+
         conn.commit()
         print(
-            f"Loaded {len(results)} drivers, {len(laps)} laps, and {len(weather)} "
-            f"weather samples for {year} {event} {session_type}"
+            f"Loaded {len(results)} drivers, {len(laps)} laps, {len(weather)} "
+            f"weather samples, and {len(raceControlDF)} race-control messages "
+            f"for {year} {event} {session_type}"
         )
 
     def previewDB(self) -> None:
@@ -575,6 +634,8 @@ class DBhandler:
         )
         print("\n --- Sample trackStatus ---")
         print(pd.read_sql("SELECT * FROM trackStatus", conn))
+        print("\n--- Sample raceControlMessages ---")
+        print(pd.read_sql("SELECT * FROM raceControlMessages LIMIT 10", conn))
 
     # ------------------------------------------------------------------
     # Reading from the database
