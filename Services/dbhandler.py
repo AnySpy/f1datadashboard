@@ -584,6 +584,94 @@ class DBhandler:
         """closes the database connection"""
         self.conn.close()
 
+    def getLapPositions(self, sessionID: int) -> dict[str, dict]:
+        """Every driver's race position on every lap of one session.
+        Feeds the Placement over Time graph (#44).
+
+        Args:
+            sessionID (int): which race (sessions.session_id)
+
+        Returns:
+            dict[str, dict]: keyed by driver code, each value contains
+                laps, positions, team, color, full_name, grid, finish,
+                classified, and status.
+        """
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT d.driver_code, d.full_name, d.team, d.color,
+                   r.grid_position, r.finish_position,
+                   r.classified_position, r.status
+            FROM drivers d
+            LEFT JOIN results r
+                   ON r.session_id = d.session_id
+                  AND r.driver_code = d.driver_code
+            WHERE d.session_id = ?
+            """,
+            (sessionID,),
+        )
+
+        drivers: dict[str, dict] = {}
+
+        for (
+            code,
+            name,
+            team,
+            color,
+            grid,
+            finish,
+            classified,
+            status,
+        ) in cursor.fetchall():
+            drivers[code] = {
+                "full_name": name,
+                "team": team,
+                "color": (
+                    f"#{color}"
+                    if color and not str(color).startswith("#")
+                    else color
+                ),
+                "grid": grid,
+                "finish": finish,
+                "classified": classified,
+                "status": status,
+                "laps": [],
+                "positions": [],
+            }
+
+        cursor.execute(
+            """
+            SELECT driver, lap_number, position
+            FROM laps
+            WHERE session_id = ?
+              AND position IS NOT NULL
+            ORDER BY driver, lap_number
+            """,
+            (sessionID,),
+        )
+
+        for code, lap, position in cursor.fetchall():
+            if code not in drivers:
+                continue
+
+            drivers[code]["laps"].append(int(lap))
+            drivers[code]["positions"].append(int(position))
+
+        fieldSize = len(drivers)
+
+        for info in drivers.values():
+            if info["laps"] and info["grid"] is not None:
+                grid = info["grid"] if info["grid"] > 0 else fieldSize
+                info["laps"].insert(0, 0)
+                info["positions"].insert(0, grid)
+
+        return {
+            code: info
+            for code, info in drivers.items()
+            if info["laps"]
+        }
+
     def getKnownDrivers(self) -> dict[str, str]:
         """Returns a list of every driver that has been recorded in the database
 
