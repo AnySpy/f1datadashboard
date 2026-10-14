@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QF
 from PySide6.QtGui import QPalette, Qt
 
 from UI.home import HomePage
-from UI.dataAnalysisPage import DataAnalysisPage
+from UI.dataAnalysisPage import GraphCanvasContainer
 from UI.driverProfiles import DriverProfiles
 
 # Import VMs
@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar(self.switch_page)
         # changed the 1st self to try to pass down currentPageIndx
         self.home = HomePage(trackStatusViewModel = self.trackStatusVM, playControlsViewModel = self.playControlsVM)
-        self.settings = DataAnalysisPage()
+        self.settings = GraphCanvasContainer()
         # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here,
         self.driverProfiles = DriverProfiles(self.driverProfilesVM)
 
