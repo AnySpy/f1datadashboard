@@ -1,11 +1,45 @@
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsView, QGraphicsProxyWidget, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QLabel, QPushButton, QSizePolicy
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsView, QGraphicsProxyWidget, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QLabel, QPushButton, QSizePolicy, QComboBox
 from PySide6.QtCore import Qt, Signal, QPointF, QSize
 from PySide6.QtGui import QPainter
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 
 from graphs.placement_over_time import placement_figure_for_session
+from UI.Theme import theme
 
-# TODO: Add a proper dropdown for graph addition
+class SearchableGraphDropdown(QComboBox):
+    def __init__(self, graphs: list[str], parent=None):
+        super().__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.addItems(graphs)
+        self.setCurrentIndex(-1)
+        # ? self.lineEdit() can return None, so this check is necessary to prevent a crash.
+        line_edit = self.lineEdit()
+        if line_edit is not None:
+            line_edit.setPlaceholderText("Add Graph")
+        self.setFixedSize(220, 36)
+
+        completer = self.completer()
+        if completer:
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+
+        self.setStyleSheet(
+            f"""
+            QComboBox {{
+                background-color: #21212e;
+                color: {theme.primaryText};
+                border-radius: 8px;
+                padding: 0px 12px;
+                font-weight: bold;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: #16161f;
+                color: {theme.primaryText};
+                selection-background-color: {theme.info};
+            }}
+            """
+        )
 
 class DragHeader(QWidget):
     def __init__(self, title: str, parent=None):
@@ -113,6 +147,24 @@ class GraphCanvasView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setStyleSheet("background-color: #16161f; border: none;")
+        self._overlay = None
+
+    def set_overlay(self, widget: QWidget):
+        self._overlay = widget
+        self._position_overlay()
+
+    def _position_overlay(self):
+        if self._overlay is None:
+            return
+        margin = 16
+        # ? This is necessary to exclude the scroll bars that appear on screen.
+        vp = self.viewport().geometry()
+        self._overlay.move(vp.right() - self._overlay.width() - margin + 1, vp.top() + margin)
+        self._overlay.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_overlay()
 
 class GraphCanvasContainer(QWidget):
     def __init__(self, parent=None):
@@ -130,11 +182,28 @@ class GraphCanvasContainer(QWidget):
         self.active_graphs: dict[str, QGraphicsProxyWidget] = {}
         self._z_counter = 0
 
-        fig_object = FigureCanvasQTAgg(placement_figure_for_session(1))
-        self.add_graph("Placement over Time", fig_object, 100, 100)
+        # ! Laps can be put in here following this format IFF they're implemented with FigureCanvasQTAgg in mind (like the Placement over Time graph is)
+        self.graph_factories = {
+            "Placement over Time": lambda: FigureCanvasQTAgg(placement_figure_for_session(1))
+        }
 
-    def add_graph(self, graph_id: str, canvas: QWidget, x: float, y: float,
-                  size: QSize = QSize(800, 500)):
+        self.dropdown = SearchableGraphDropdown(list(self.graph_factories), self.view)
+        self.view.set_overlay(self.dropdown)
+        self.dropdown.textActivated.connect(self._on_graph_selected)
+
+    def _on_graph_selected(self, name: str):
+        factory = self.graph_factories.get(name)
+        if factory is not None and name not in self.active_graphs:
+            # ? These numbers *should* put it near the top left of wherever the user is looking at currently
+            spot = self.view.mapToScene(40, 70)
+            # ? This will cascade them if the user clicks a bunch of graphs on at once
+            offset = 30 * len(self.active_graphs)
+            self.add_graph(name, factory(), spot.x() + offset, spot.y() + offset)
+
+        self.dropdown.setCurrentIndex(-1)
+        self.dropdown.clearEditText()
+
+    def add_graph(self, graph_id: str, canvas: QWidget, x: float, y: float, size: QSize = QSize(800, 500)):
         if graph_id in self.active_graphs:
             return
 
