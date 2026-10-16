@@ -17,12 +17,13 @@ from PySide6.QtGui import QPixmap
 from UI.Theme import theme
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
 
-# ? Layouts to match home.py's layout. None of these should be used elsewhere.
+# ? Layouts to match home.py's layout. None of these should be used outside this code ideally.
 _gridMargin: int = 12
 _padding: int = 12
 _borderRadius: int = 20
 
 class Card(QFrame):
+    """Setup for the cards to use for layouts"""
     def __init__(self):
         super().__init__()
         self.setStyleSheet(
@@ -33,16 +34,20 @@ class Card(QFrame):
         )
 
 class SearchableDriverDropdown(QComboBox):
+    """Dropdown menu for the head-to-head comparison view"""
     def __init__(self, driver_codes: list[str]):
         super().__init__()
+        # ? Allows the user to edit text and adds the list of driver codes (VER, HAM, etc.) to the dropdown
         self.setEditable(True)
         self.addItems(driver_codes)
 
+        # ? Autocompleter implementation
         completer = self.completer()
         if completer:
             completer.setFilterMode(Qt.MatchFlag.MatchContains)
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
 
+        # ? QSS to make it look ⋆˙⟡ stunning ✧˖°.
         self.setStyleSheet(
             f"""
             QComboBox {{
@@ -61,6 +66,9 @@ class SearchableDriverDropdown(QComboBox):
         )
 
 class ModeHeaderBar(QWidget):
+    """Object that allows swapping between comparison view and normal view"""
+
+    # ? Private signal with property to read from
     __compare_mode_toggled = Signal(bool)
 
     @property
@@ -69,6 +77,7 @@ class ModeHeaderBar(QWidget):
 
     def __init__(self):
         super().__init__()
+        # ? Starts in single driver view
         self.is_compare_mode = False
 
         layout = QHBoxLayout(self)
@@ -77,9 +86,11 @@ class ModeHeaderBar(QWidget):
         title = QLabel("Driver Profiles")
         title.setStyleSheet("color: {theme.primaryText}; font-size: 16px; font-weight: bold;")
 
+        # ? I added a space at the beginning of the button text because it looked better to me. It *can* be removed, but I like it this way
         self.toggle_button = QPushButton(" Compare Drivers")
         self.toggle_button.setCheckable(True)
         self.toggle_button.setFixedHeight(32)
+        # TODO: Add a hover effect
         self.toggle_button.setStyleSheet(
             f"""
             QPushButton {{
@@ -97,17 +108,26 @@ class ModeHeaderBar(QWidget):
         )
         self.toggle_button.toggled.connect(self._on_toggled)
 
+        # ? Places the "Driver Profile" text in the top left and then puts the button in the top right
         layout.addWidget(title)
         layout.addStretch()
         layout.addWidget(self.toggle_button)
 
     def _on_toggled(self, checked: bool):
+        """Helper function to swap between single view and comparison view
+
+        Args:
+            checked (bool): _description_
+        """
         self.is_compare_mode = checked
         self.toggle_button.setText(" Exit Comparison" if checked else " Compare Drivers")
         self.__compare_mode_toggled.emit(checked)
 
-# Top nav bar. This should probably be a search bar in hindsight, but I like the design of this right now so we're going with it.
+# TODO: Possibly change to a search bar later? Depends on how many drivers get loaded in.
 class DriverNavBar(Card):
+    """Top nav bar"""
+    
+    # ? Private signal and property to read from
     __driver_selected = Signal(str)
 
     @property
@@ -116,11 +136,11 @@ class DriverNavBar(Card):
 
     def __init__(self, driver_codes: list[str]):
         super().__init__()
-
         self.setFixedHeight(64)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         layout = QHBoxLayout(self)
+        # ? This can probably be simplified to not use global values (padding is almost certainly the wrong one, but it's just (12, 12, 12, 12) anyways :shrug:)
         layout.setContentsMargins(_padding, _padding, _padding, _padding)
         layout.setSpacing(10)
 
@@ -163,12 +183,15 @@ class DriverNavBar(Card):
 
         layout.addWidget(scroll_area)
 
+    # ? Just a helper to emit the signal as changed.
     def _on_driver_button_clicked(self, code):
         self.selected_driver_changed.emit(code)
 
 
-# Left side, contains a picture, the name of the driver, and their biography
 class DriverAboutSection(Card):
+    """Left side image, name, and bio of driver in single view"""
+
+    # ? Private signals and properties to read them from
     __driver_bio = Signal(str)
     __driver_name = Signal(str)
     __driver_img = Signal(str)
@@ -195,6 +218,7 @@ class DriverAboutSection(Card):
 
         self.image_holder = QLabel()
         self.image_holder.setFixedSize(100, 100)
+        # ? Since no driver is selected initially, I'm just displaying the placeholder image
         self.image_holder.setPixmap(QPixmap("images/Driver_Not_found.jpg"))
 
         self.name = QLabel("SELECT A DRIVER")
@@ -219,6 +243,7 @@ class DriverAboutSection(Card):
         layout.addWidget(about_title, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(scroll_area)
 
+    # ? Helpers to update the displayed text
     def update_bio(self, bio_text: str) -> None:
         self.about_text.setText(bio_text)
 
@@ -228,9 +253,8 @@ class DriverAboutSection(Card):
     def update_img(self, pixmap: QPixmap) -> None:
         self.image_holder.setPixmap(pixmap)
 
-
-# Right side, contains their placement history and their career stats
 class DriverStatsSection(Card):
+    """Stat section card on the right side of the view"""
     def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
         self.view_model = view_model
@@ -244,6 +268,7 @@ class DriverStatsSection(Card):
         self.main_layout.addWidget(placements_title)
 
         # TODO: Pull this from Viewmodel later
+        # ! Still having a hard time knowing where to pull this from. I need to sit down and inspect this at some point
         placement_history = [8, 1, 2, 1, 4]
         location_history = ["London", "Paris", "Norway", "Quatar", "Turkey"]
         formatted_cards = self.view_model.get_formatted_placements(placement_history, location_history)
@@ -345,6 +370,7 @@ class DriverStatsSection(Card):
         self.main_layout.insertWidget(0, widget)
 
 class DriverProfiles(QWidget):
+    """Master view for the driver profile page"""
     def __init__(self, view_model: DriverProfilesViewModel):
         super().__init__()
         self.view_model = view_model
@@ -354,9 +380,11 @@ class DriverProfiles(QWidget):
         main_layout.setSpacing(12)
         main_layout.setContentsMargins(_gridMargin, _gridMargin, _gridMargin, _gridMargin)
 
+        # ? Header bar
         self.header_bar = ModeHeaderBar()
         main_layout.addWidget(self.header_bar)
 
+        # ? Nav bar
         self.nav_bar = DriverNavBar(self.driver_codes)
         main_layout.addWidget(self.nav_bar)
 
@@ -367,11 +395,11 @@ class DriverProfiles(QWidget):
 
         self.left_stack = QStackedWidget()
 
-        # Left Page 0: Biography Section
+        # ? Sets the about section
         self.driver_about_section = DriverAboutSection(self.view_model)
         self.left_stack.addWidget(self.driver_about_section)
 
-        # Left Page 1: Driver A Stats Card (with Dropdown)
+        # ? Sets the stat section
         self.driver_a_stats_section = DriverStatsSection(self.view_model)
         self.dropdown_a = SearchableDriverDropdown(self.driver_codes)
         self.driver_a_stats_section.add_header_widget(self.dropdown_a)
@@ -379,6 +407,7 @@ class DriverProfiles(QWidget):
 
         self.grid.addWidget(self.left_stack, 0, 0)
 
+        # ? The rest of this handles comparison view logistics
         self.driver_b_stats_section = DriverStatsSection(self.view_model)
         self.dropdown_b = SearchableDriverDropdown(self.driver_codes)
         self.driver_b_stats_section.add_header_widget(self.dropdown_b)
@@ -406,6 +435,11 @@ class DriverProfiles(QWidget):
         self.view_model.stats_changed.connect(self.driver_b_stats_section.update_stats)
 
     def _set_compare_mode(self, enabled: bool) -> None:
+        """Helper function for toggling comparison mode
+
+        Args:
+            enabled (bool): If enabled, compare mode is toggled on. Otherwise, it toggles off.
+        """
         if enabled:
             self.nav_bar.hide()
             self.left_stack.setCurrentIndex(1)
@@ -413,12 +447,10 @@ class DriverProfiles(QWidget):
 
             self.view_model.stats_changed.disconnect(self.driver_b_stats_section.update_stats)
             self.view_model.stats_b_changed.connect(self.driver_b_stats_section.update_stats)
-
         else:
             self.nav_bar.show()
             self.left_stack.setCurrentIndex(0)
             self.dropdown_b.hide()
 
-            # Right side switches from Driver B → Driver A/current driver
             self.view_model.stats_b_changed.disconnect(self.driver_b_stats_section.update_stats)
             self.view_model.stats_changed.connect(self.driver_b_stats_section.update_stats)

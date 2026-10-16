@@ -14,6 +14,7 @@ class ImageWorkerSignals(QObject):
         return self.__finished
 
 class ImageWorker(QRunnable):
+    """Worker object to edit image on a second thread"""
     def __init__(self, scraper: DriverStatScraper, soup: BeautifulSoup, size: int = 100):
         super().__init__()
         self.scraper = scraper
@@ -22,6 +23,7 @@ class ImageWorker(QRunnable):
         self.signals = ImageWorkerSignals()
 
     def run(self):
+        """This is the code that is run when the worker object is given the start method"""
         image_bytes = self.scraper.fetch_driver_image(self.soup)
 
         pixmap = QPixmap()
@@ -33,7 +35,6 @@ class ImageWorker(QRunnable):
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation
         )
-
         canvas = QPixmap(self.size, self.size)
         canvas.fill(Qt.GlobalColor.transparent)
 
@@ -50,21 +51,7 @@ class ImageWorker(QRunnable):
         self.signals.finished_signal.emit(canvas)
 
 class DriverProfilesViewModel(QObject):
-    """_summary_
-
-    Args:
-        QObject (_type_): _description_
-
-    Methods:
-        - fetchDriverInfo(season, session, race)
-
-
-    Variables:
-        - driver1 from class
-        - driver2 from class
-
-    """
-
+    """Master driver profile VM object"""
     # ? Private signals and properties to read those signals externally
     __stats_loaded = Signal(dict)
     __bio_loaded = Signal(str)
@@ -228,6 +215,13 @@ class DriverProfilesViewModel(QObject):
         self.thread_pool.start(worker)
 
     def select_driver_b(self, driver_code: str):
+        """Binds to the signal objects from the driverProfiles to update the display
+
+        Args:
+            driver_code (str): The code of the driver (e.g. Max Verstappen would be `VER`)
+        """
+
+        # ? Almost a carbon copy of select_driver (copy+paste was my friend), but binding to different signals.
         driver_dict = self._get_known_drivers()
 
         _driver_display_name = driver_dict[driver_code]
