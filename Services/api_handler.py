@@ -28,7 +28,7 @@ def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
     # Names will need to be pushed to frontend for selection.
 
 
-def get_race(year: int, event_name: str, type: str = "R") -> None:
+def get_race(year: int, event_name: str, type: str = "R") -> int | None:
     """Will get a race from fastf1's API AND load it into the database
 
     Args:
@@ -42,7 +42,8 @@ def get_race(year: int, event_name: str, type: str = "R") -> None:
         new_session_id = handler.loadSessionIntoDB(fastf1.get_session(year, event_name, type))
     finally:
         handler.close()
-        return new_session_id
+    
+    return new_session_id
 
 
 # Helper/Debug Functions
