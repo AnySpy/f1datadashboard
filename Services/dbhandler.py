@@ -577,7 +577,7 @@ class DBhandler:
         # Reloading a race used to insert its laps/weather/trackStatus rows a
         # second time (those tables have no unique key). Clear this session's old
         # rows first so a reload replaces the data instead of duplicating it.
-        for table in ("laps", "weather", "trackStatus", "results", "live_driver_telemetry", "circuit_corners_data", "raceControlMessages")
+        for table in ("laps", "weather", "trackStatus", "results", "live_driver_telemetry", "circuit_corners_data", "raceControlMessages"):
             cur.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
 
         # Insert drivers
