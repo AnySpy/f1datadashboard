@@ -406,6 +406,7 @@ class DBhandler:
             SPEED REAL,
             rpm REAL,
             PRIMARY KEY (session_id, driver_code, session_time)
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
             )
 
 
@@ -588,7 +589,7 @@ class DBhandler:
             lap_time = (
                 lap["LapTime"].total_seconds() if pd.notna(lap["LapTime"]) else None
             )
-            # NOTE: timedelta doesn't provide the data I need remove before commit
+            # NOTE: Keep this until I can gaurantee that the session is aligning correctly for the simulation
             lap_timedelta_str: str = str(lap["LapTime"])
             is_pit = (
                 1
