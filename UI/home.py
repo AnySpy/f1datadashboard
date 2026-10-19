@@ -66,7 +66,7 @@ class TrackStatusCard(Card):
 
     def __init__(self, trackStatusVM: TrackStatusVM):
         super().__init__()
-        self.statusStyles: dict = {"AllClear": theme.success, "Yellow": theme.warning, "Red" : theme.danger, "VSCDeployed" : theme.safety}
+        self.statusStyles: dict = {"AllClear": theme.success, "Yellow": theme.warning, "Red" : theme.danger, "VSCDeployed" : theme.safety, "Idle" : theme.info}
         #self.setStyleSheet(f"""background-color: {theme.background}""")
         self.setStyleSheet(f"background-color: none")
         self.setFixedHeight(50)
@@ -343,7 +343,6 @@ class DriverSIM(Card):
         self.trackStatusCard = TrackStatusCard(trackStatus)
         self.trackStatusCard.setParent(self)
         self.trackStatusCard.raise_()
-        self.raceSimCanvas.drawTrackOutline()
         layout.addWidget(self.playControlsUI)
 
 

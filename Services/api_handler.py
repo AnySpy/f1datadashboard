@@ -9,6 +9,8 @@ from fastf1.events import EventSchedule
         - If f1cache contains > 5 items delete last used item
 """
 
+fastf1.logger.set_log_level("DEBUG")
+
 def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
     """When passed a year as an int, will return the name of the events.
     Should be called to gain a list of events in a year
@@ -34,6 +36,7 @@ def get_race(year: int, event_name: str, type: str = "R") -> None:
         type (str, optional): What type of race to grab. Types: 'FP1', 'FP2', 'FP3', 'Q', 'R'. Defaults to "R".
     """
     handler = DBhandler()
+    new_session_id = None
     try:
         new_session_id = handler.loadSessionIntoDB(fastf1.get_session(year, event_name, type))
     finally:

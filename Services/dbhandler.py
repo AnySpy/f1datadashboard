@@ -40,6 +40,8 @@ def _to_text(value):
     """NaN / None / "" -> None, otherwise a string"""
     return None if pd.isna(value) or str(value).strip() == "" else str(value)
 
+def _to_seconds(value):
+    return None if pd.isna(value) else value.total_seconds()
 
 def calculateTotalSessionTime(session: Session) -> float:
     """_helper function to calculate the total session time based off of session flags_
@@ -261,6 +263,7 @@ class DBhandler:
             session_type TEXT NOT NULL,
             total_laps INTEGER,
             total_time FLOAT NOT NULL,
+            track_rotation REAL, 
             UNIQUE(year, event_name, session_type)
         )
         """)
@@ -280,6 +283,8 @@ class DBhandler:
             track_status TEXT,
             is_pit_lap INTEGER,
             position INTEGER,
+            lap_start_time REAL,
+            lap_end_time REAL,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
         )
         """)
@@ -405,6 +410,20 @@ class DBhandler:
 
 
         """)
+        # table schema for circuit_corners_data
+        # NOTE: this is for draw the track simulation. need corner data for some of the funcitons
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS circuit_corners_data (
+            session_id INTEGER NOT NULL,
+            corner_number INTEGER NOT NULL, 
+            letter TEXT NOT NULL DEFAULT '',
+            x_pos REAL NOT NULL, 
+            y_pos REAL NOT NULL, 
+            angle REAL,
+            PRIMARY KEY (session_id, corner_number, letter),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+        )
+        """)
 
         conn.commit()
    
@@ -511,8 +530,6 @@ class DBhandler:
         """,
             (total_laps, session_time, year, event, session_type),
         )
-        conn.commit()
-
         cur.execute(
             """
             SELECT session_id FROM sessions
@@ -525,7 +542,7 @@ class DBhandler:
         # Reloading a race used to insert its laps/weather/trackStatus rows a
         # second time (those tables have no unique key). Clear this session's old
         # rows first so a reload replaces the data instead of duplicating it.
-        for table in ("laps", "weather", "trackStatus", "results"):
+        for table in ("laps", "weather", "trackStatus", "results", "live_driver_telemetry", "circuit_corners_data"):
             cur.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
 
         # Insert drivers
@@ -544,7 +561,6 @@ class DBhandler:
                     row.get("TeamColor"),
                 ),
             )
-        conn.commit()
 
         # Insert results
         for _, row in results.iterrows():
@@ -582,8 +598,8 @@ class DBhandler:
             cur.execute(
                 """
                 INSERT INTO laps (session_id, driver, team, lap_number, lap_completion_timestamp, lap_time_seconds,
-                                   compound, tyre_life, track_status, is_pit_lap, position)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   compound, tyre_life, track_status, is_pit_lap, position, lap_start_time, lap_end_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     session_id,
@@ -599,6 +615,8 @@ class DBhandler:
                     _to_int(
                         lap.get("Position")
                     ),  # race position at the end of this lap
+                    _to_seconds(lap.get("LapStartTime")),
+                    _to_seconds(lap.get("Time")),
                 ),
             )
         # insert live_driver_telemetry
@@ -649,6 +667,28 @@ class DBhandler:
                 """,
                 (session_id, timeStampInSeconds, statusNumCode, message),
             )
+
+        # insert circuit_corners_data
+        circuitInfo = session.get_circuit_info()
+        cur.execute(
+            "UPDATE sessions SET track_rotation = ? WHERE session_id = ?",
+            (float(circuitInfo.rotation), session_id),
+        )
+
+        for _, circuit in circuitInfo.corners.iterrows():
+            if pd.isna(circuit["Letter"]):
+                letter = ""
+            else:
+                letter = str(circuit["Letter"])
+            cur.executemany(
+                """
+                INSERT INTO circuit_corners_data
+                (session_id, corner_number, letter, x_pos, y_pos, angle)
+                VALUES (?,?,?,?,?,?)
+                """,
+                [(session_id, int(circuit["Number"]), letter, float(circuit["X"]), float(circuit["Y"]), float(circuit["Angle"]))],
+            )
+        
         conn.commit()
         print(
             f"Loaded {len(results)} drivers, {len(laps)} laps, and {len(weather)} "
@@ -677,7 +717,7 @@ class DBhandler:
         print(pd.read_sql("SELECT * FROM trackStatus", conn))
 
         print("--- Sample live_driver_telemetry ---")
-        print(pd.read_sql("SELECT * FROM live_driver_telemetry LIMIT 5"))
+        print(pd.read_sql("SELECT * FROM live_driver_telemetry LIMIT 5", conn))
 
     # ------------------------------------------------------------------
     # Reading from the database
@@ -898,10 +938,65 @@ class DBhandler:
         # procecs the sessionTable and make it a list[dicts]
         return sessionTableDict
 
+    # NOTE: rewrite this to be more standard compared to other getters
     def getDriverPosData(self, session_id: int) -> pd.DataFrame:
-        cursor = self.conn.cursor()
-        cursor.execute()
+        """_return a dataframe with all of the position data from a session then order by driver and time_
 
+        Args:
+            session_id (int): _description_
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        return pd.read_sql_query(
+        """
+        SELECT driver_code, session_time, x_pos, y_pos
+        FROM live_driver_telemetry
+        WHERE session_id = ?
+        ORDER BY driver_code, session_time
+        """, self.conn, params=(session_id,),
+    )
+
+    def getFastestLapPositions(self, session_id: int) -> pd.DataFrame:
+        row = self.conn.execute(
+            """
+            SELECT driver, lap_start_time, lap_end_time 
+            FROM laps 
+            WHERE session_id = ? AND lap_time_seconds IS NOT NULL AND lap_start_time IS NOT NULL AND lap_end_time IS NOT NULL
+            ORDER BY lap_time_seconds ASC LIMIT 1
+            """,
+            (session_id,), ).fetchone()
+        if row is None:
+            return pd.DataFrame(columns=["X", "Y"])
+        driver, startTime, endTime = row
+        return pd.read_sql_query(
+            """ 
+            SELECT x_pos, y_pos
+            FROM live_driver_telemetry
+            WHERE session_id = ? AND driver_code = ? AND session_time BETWEEN ? AND ?
+            ORDER BY session_time
+            """,
+            self.conn, params =(session_id, driver, startTime, endTime),
+        )
+
+    def getCircuitRotation(self, session_id: int) -> float:
+        row = self.conn.execute(
+            "SELECT track_rotation FROM sessions WHERE session_id = ?",
+        (session_id,)
+        ).fetchone()
+        return float(row[0]) if row and row[0] is not None else 0.0
+
+    def getCorners(self, session_id:int) -> pd.DataFrame:
+        return pd.read_sql_query(
+            """
+            SELECT corner_number, letter, x_pos, y_pos, angle
+            FROM circuit_corners_data
+            WHERE session_id = ?
+            ORDER BY corner_number
+            """,
+            self.conn, params = (session_id, ),
+        )
+    
     def __deleteSessionData(self, session_id:int) -> None:
         """ 
             _delete session data from the database to keep the total size of application down_
@@ -1021,6 +1116,20 @@ class DBhandler:
         # because speed is different for every driver
         return 0.00
 
+    def getFirstIndexOfTrackStatus(self, session_id: int) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT entry_id 
+            FROM trackStatus 
+            WHERE session_id = ? 
+            ORDER BY time ASC, entry_id ASC 
+            LIMIT 1
+            """, 
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row is not None else -1
 
 def main():
     dbHandler = DBhandler()

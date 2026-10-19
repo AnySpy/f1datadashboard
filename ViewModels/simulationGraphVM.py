@@ -44,17 +44,32 @@ class SimulationCanvas(FigureCanvasQTAgg):
         """
         self.ax.margins(0.03)
         self.sessionSelectorVM.currentSessionIDChanged.connect(self.drawTrackOutline)
-        self.loadDriverGPSPos()
+        #self.loadDriverGPSPos()
         #print(f" VER gps pos data frame \n {self.getDriverGPSPos(abbr = "VER")}")
 
-    def onSessionChanged(self):
-        self.loadDriverGPSPos()
+    def onSessionChanged(self, session_id: int):
+        """_when session is changed load drivers GPS data into mem and draw the track outline for the race_
+        """
+        self.loadDriverGPSPos(session_id= session_id)
 
     def getDriverGPSPos(self, abbr: str) -> pd.DataFrame | None:
+        """_test to insure driver data was loaded into driverGPSPos dict_
+
+        Args:
+            abbr (str): _driver code to fetch by _
+
+        Returns:
+            pd.DataFrame | None: _convert the data into a dataframe_
+        """
         return self.driverGPSPos.get(abbr.upper()).head(5)
 
     # TODO: refactor to pull the data from the db
     def loadDriverGPSPos(self, session_id: int):
+        """__
+
+        Args:
+            session_id (int): _description_
+        """
 
         session: pd.DataFrame
         #session = fastf1.get_session(year, event, sessionType)
@@ -74,21 +89,30 @@ class SimulationCanvas(FigureCanvasQTAgg):
                 self.driverGPSPos[abbr] = pd.concat(frames, ignore_index=True)
 
     # NOTE: refactoring to pull data from db instead
-    def drawTrackOutline(self):
+    def drawTrackOutline(self, session_id: int):
         # make this modular and don't load a fastf1 session every time pull data from rows in the database
-        session = fastf1.get_session(2023, 'Bahrain', 'R')
-        session.load()
+        self.ax.clear()
+        self.ax.set_aspect("equal")
+        self.ax.axis("off")
 
-        lap = session.laps.pick_fastest()
-        pos = lap.get_pos_data()
+        fastestLap: pd.DataFrame= self.dbHandler.getFastestLapPositions(session_id)
+        circuitCornerInfo: pd.DataFrame = self.dbHandler.getCorners(session_id)
+        circuitRotation: float = self.dbHandler.getCircuitRotation(session_id)
+
+        if fastestLap.empty:
+            print(f"drawTrackOutline: no fastestLap for session {session_id}")
+            self.draw_idle()
+            return
+
+        # lap = session.laps.pick_fastest()
         #print(pos.columns)
-        circuit_info = session.get_circuit_info()
+        # circuit_info = session.get_circuit_info()
         # Get an array of shape [n, 2] where n is the number of points and the second
         # axis is x and y.
-        track = pos.loc[:, ('X', 'Y')].to_numpy()
+        track = fastestLap.loc[:, ["x_pos", "y_pos"]].to_numpy()
 
         # Convert the rotation angle from degrees to radian.
-        track_angle = circuit_info.rotation / 180 * np.pi
+        track_angle = circuitRotation / 180 * np.pi
 
         # Rotate and plot the track map.
         rotated_track = self.rotate(track, angle=track_angle)
@@ -96,25 +120,25 @@ class SimulationCanvas(FigureCanvasQTAgg):
         offset_vector = [500, 0]  # offset length is chosen arbitrarily to 'look good'
 
 # Iterate over all corners.
-        for _, corner in circuit_info.corners.iterrows():
+        for _, corner in circuitCornerInfo.iterrows():
             # Create a string from corner number and letter
-            txt = f"{corner['Number']}{corner['Letter']}"
+            txt = f"{corner['corner_number']}{corner['letter']}"
 
             # Convert the angle from degrees to radian.
-            offset_angle = corner['Angle'] / 180 * np.pi
+            offset_angle = corner['angle'] / 180 * np.pi
 
             # Rotate the offset vector so that it points sideways from the track.
             offset_x, offset_y = self.rotate(offset_vector, angle=offset_angle)
 
             # Add the offset to the position of the corner
-            text_x = corner['X'] + offset_x
-            text_y = corner['Y'] + offset_y
+            text_x = corner['x_pos'] + offset_x
+            text_y = corner['y_pos'] + offset_y
 
             # Rotate the text position equivalently to the rest of the track map
             text_x, text_y = self.rotate([text_x, text_y], angle=track_angle)
 
             # Rotate the center of the corner equivalently to the rest of the track map
-            track_x, track_y = self.rotate([corner['X'], corner['Y']], angle=track_angle)
+            track_x, track_y = self.rotate([corner['x_pos'], corner['y_pos']], angle=track_angle)
 
             # Draw a circle next to the track.
             self.ax.scatter(text_x, text_y, color='grey', s=140)

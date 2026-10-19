@@ -145,7 +145,7 @@ class TrackStatusVM(QObject):
             self.setSafetyStatus("Idle")
             self.lastStatusChangeTime = 0.00
             # NOTE: find first index of session | write a function to find this 
-            self.currentIndex = 0 # start fo session 
+            self.currentIndex = self.dbHandler.getFirstIndexOfTrackStatus() # start fo session 
             self.nextStatusChangeTime = self._getNextChangeTime(self.currentIndex)
         else:
             #grab next change time from table status
@@ -161,4 +161,3 @@ class TrackStatusVM(QObject):
         # newStatus = dbHandler.getSafetyStatus()
         # stub value need to wright a try except block for getting data from db
         self.setSurfaceStatus("test")
-
