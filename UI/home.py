@@ -3,6 +3,9 @@ from PySide6.QtCore import Signal, Qt
 from UI.Theme import theme
 from ViewModels.raceSimulationVM import PlayControlsVM
 from ViewModels.trackStatusVM import TrackStatusVM
+from ViewModels.simulationGraphVM import SimulationCanvas
+from ViewModels.sessionSelectorVM import SessionSelectorVM
+from ViewModels.connectivityVM import ConnectivityVM
 from Services.dbhandler import DBhandler
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -27,7 +30,7 @@ borderRadius: int= 20
     - move the scrubber to its own class
     - might make a vm for the scrubber 
     - flags to show visually on scrubber (race start, trackstatus changes, finish flag)
-    - comment out print debug statements
+    - fix track clipping when user makes window smaller
 """
 
 
@@ -41,7 +44,8 @@ class Card(QFrame):
         self.setStyleSheet(
         f"""
                 background-color: {theme.background};
-                border-radius: {borderRadius};        
+                border-radius: {borderRadius};
+                color: {theme.primaryText}      
         """
         )
 
@@ -62,9 +66,11 @@ class TrackStatusCard(Card):
 
     def __init__(self, trackStatusVM: TrackStatusVM):
         super().__init__()
-        self.statusStyles: dict = {"AllClear": theme.success, "Yellow": theme.warning, "Red" : theme.danger, "VSCDeployed" : theme.safety}
+        self.statusStyles: dict = {"AllClear": theme.success, "Yellow": theme.warning, "Red" : theme.danger, "VSCDeployed" : theme.safety, "Idle" : theme.info}
         #self.setStyleSheet(f"""background-color: {theme.background}""")
-        self.setMaximumHeight(50)
+        self.setStyleSheet(f"background-color: none")
+        self.setFixedHeight(50)
+        self.setMaximumWidth(140)
         # share the mem location of the initialized VM
         self.trackStatusVM = trackStatusVM
         # stub info while waiting for race to load
@@ -90,6 +96,25 @@ class TrackStatusCard(Card):
         self.statusLabel.setText(self.message)
         self.statusLabel.setStyleSheet(f"color: {self.statusStyles[self.message]}")
 
+class ComboBoxStyling(QComboBox):
+    def __init__(self):
+        super().__init__()
+        self.setStyle(QStyleFactory.create("Fusion"))
+        self.setStyleSheet(
+            f"""
+            QComboBox {{
+                color: {theme.primaryText};
+                border-radius: {borderRadius};
+                padding: 2px;
+            }}
+
+            QComboBox::drop-down {{
+                width: 14px;
+                border: 1px solid {theme.secondaryText};
+
+            }}
+            """
+        )
 
 class PlayControlsUI(Card):
     """ _Front-end for the PlayControls VM. this controls the user input for toggling play, scrubbing, and playback speed_
@@ -120,6 +145,7 @@ class PlayControlsUI(Card):
         # ? I had to change this to Qt.Orientation.Horizontal to get it to compile for some reason. Apparently it's a newer change with PySide6?
         # create the slider NOTE: might want to make this it's own class later on
         self.scrubSlider = QSlider(Qt.Orientation.Horizontal)
+        self.scrubSlider.setMinimumHeight(40)
         self.scrubSlider.setRange(0, 100)  # will be rescaled once duration is known
         self.durationLabel = QLabel(self.formattedTime)
         # set the signal changes
@@ -153,7 +179,8 @@ class PlayControlsUI(Card):
         
 
         # change playback speed
-        self.speedBox = QComboBox()
+        self.speedBox = ComboBoxStyling()
+        '''
         self.speedBox.setStyle(QStyleFactory.create("Fusion"))
         self.speedBox.setStyleSheet(
             f"""
@@ -169,6 +196,7 @@ class PlayControlsUI(Card):
             }}
             """
         )
+        '''
         for s in self.SPEEDS:
             self.speedBox.addItem(f"{s}x", s)
         self.speedBox.setCurrentIndex(self.SPEEDS.index(1))
@@ -258,13 +286,12 @@ class HomePage(QWidget):
     """_Home page UI layout, instantiates different UI objects and places them on the homepage widget_
 
     """
-    def __init__(self, trackStatusViewModel: TrackStatusVM, playControlsViewModel):
+    def __init__(self, trackStatusViewModel: TrackStatusVM, playControlsViewModel: PlayControlsVM, sessionSelectorViewModel: SessionSelectorVM, conectivityViewModel: ConnectivityVM ):
         super().__init__()
         # share the mem location of VMs
-        self.monitorTrackStatus = trackStatusViewModel
+        self.trackStatusController = trackStatusViewModel
         self.playControlsController = playControlsViewModel
-        # NOTE: hard coded, in future this should be held within sessionSelectorVM
-        self.currentSessionID = 1
+        self.sessionSelectorController = sessionSelectorViewModel
         
         # make a grid layout of 13x11ish
         # grid layout (rowstart, colstart, spanrows, spancols)
@@ -274,10 +301,10 @@ class HomePage(QWidget):
         # setting the margins of the grid to a standard size
         gridLayout.setContentsMargins(gridMargin, gridMargin, gridMargin, gridMargin)
         # create the simulation frame
-        driverSimFrame = DriverSIM(trackStatus = self.monitorTrackStatus, playControlsController = self.playControlsController)
+        driverSimFrame = DriverSIM(trackStatus = self.trackStatusController, playControlsController = self.playControlsController, sessionSelectorVM=self.sessionSelectorController)
         gridLayout.addWidget(driverSimFrame, 1,0, 3, 3)
         # create the session selector
-        sessionFrame = SessionSelector()
+        sessionFrame = SessionSelector(sessionSelectorViewModel, conectivityViewModel)
         gridLayout.addWidget(sessionFrame, 0, 0, 1, 3)
         # create the driver placement UI 
         driverStandingsFrame = DriverStandings()
@@ -289,24 +316,33 @@ class HomePage(QWidget):
         driverTelemetryCard2 = DriverTelemetry()
         gridLayout.addWidget(driverTelemetryCard2, 5, 0, 1, 4)
         # NOTE: this should not control this, make playControls fetch this on init call the playControlsVM to fetch the race duration
-        self.playControlsController.fetchRaceDuration(self.currentSessionID)
+        self.playControlsController.fetchRaceDuration(self.sessionSelectorController.currentSessionID)
 
 
 class DriverSIM(Card):
     """
     _UI for the visual race simulation where the drivers are placed on a graph and have their live gps data transmitted to move their vehicles_
     """
-    def __init__(self, trackStatus: TrackStatusVM, playControlsController: PlayControlsVM):
+    def __init__(self, trackStatus: TrackStatusVM, playControlsController: PlayControlsVM, sessionSelectorVM: SessionSelectorVM):
         super().__init__()
+        self.raceSimCanvas = SimulationCanvas(sessionSelectorVM= sessionSelectorVM)
+        self.setStyleSheet(f"""
+            DriverSIM {{
+               background-color: {theme.background}; 
+               border-radius: {borderRadius};
+            }}
+        """)
         # self.setStyleSheet(f"background-color: {theme.info}")
         layout = QVBoxLayout(self)
+        layout.setSpacing(0)
         # create the track status card that will sit inside of the race sim
-        self.trackStatusCard = TrackStatusCard(trackStatus)
         # create the playcontrols that will sit at the bottom row of the race sim
         self.playControlsUI = PlayControlsUI(playControlsController)
-        layout.addWidget(self.trackStatusCard)
         # this will hold the simulated race
-        layout.addWidget(QLabel("Race Sim"))
+        layout.addWidget(self.raceSimCanvas)
+        self.trackStatusCard = TrackStatusCard(trackStatus)
+        self.trackStatusCard.setParent(self)
+        self.trackStatusCard.raise_()
         layout.addWidget(self.playControlsUI)
 
 
@@ -337,36 +373,124 @@ class SessionSelector(Card):
     """
     _UI element that creates a few dropdown menus and submit button so the user can change sessions_
     """
-    def __init__(self):
+    def __init__(self, sessionSelectorViewModel: SessionSelectorVM, conectivityViewModel: ConnectivityVM):
         super().__init__()
+        self.sessionSelectorViewModel = sessionSelectorViewModel
+        self.conectivityViewModel = conectivityViewModel
+        self.conectivityViewModel.onlineChanged.connect(self.__onConnectionChange)
+        self.sessionSelectorViewModel.availableListChanged.connect(self.__setAvailableYears)
+        #self.sessionSelectorViewModel.availableList.connect(self.__setAvailableSessions)
         self.setMaximumHeight(50)
         # create and add a label for layout purposes
         layout = QHBoxLayout(self)
         layout.addWidget(QLabel("Current Session"))
         # year dropdown menu
+        
         # TODO: insure that downloaded sessions are also in a separate section
-        self.yearSelector = QComboBox()
+        self.yearSelector = ComboBoxStyling()
         self.yearSelector.setPlaceholderText("Select Year")
+        self.yearSelector.textActivated.connect(self.__setAvailableEvents)
         # seesion dropdown menu
         # TODO: on session selected load session into view
-        self.sessionSelector = QComboBox()
-        self.sessionSelector.setPlaceholderText("Select Session")
+        self.eventSelector = ComboBoxStyling()
+        self.eventSelector.setPlaceholderText("Select Event")
+        self.eventSelector.textActivated.connect(self.__changeSimulatedSession)
 
+        """
+        TODO: for future implementation 
+        self.sessionSelector = ComboBoxStyling()
+        self.sessionSelector.setPlaceholderText("Select Session")
+        """
+
+        self.connectionLabel = QLabel("None")
+
+        # call the connectivity setup after connectionLabel has been created
+        self.conectivityViewModel.setup()
+        
         layout.addWidget(self.yearSelector)
-        layout.addWidget(self.sessionSelector)
+        layout.addWidget(self.eventSelector)
+        #layout.addWidget(self.sessionSelector)
+        layout.addWidget(self.connectionLabel)
 
 
         # self.yearSelector.currentIndexChanged.connect(self.onYearChanged)
         # self.sessionSelector.currentIndexChanged.connect(self.sessionSelectorVM.onSessionChanged)
-    def setAvailableYears(self):
-        """
-        grabs available years from fastf1 api call
-        if sys.currentyear > most recent year in db then call fastf1 api to get new data
-        """
-        print("change years available for selection")
-    def setAvailableSessions(self):
-        """
-        once yearSelector is chosen ask fastf1 api 
-        """
-        print("change sessions available for review")
+    
+        # def __updateComboBoxes(self):
         
+    def __changeSimulatedSession(self) -> int:
+        """_This runs when user selects a session within the race, it calls the sessionSelector method onRaceSelcted to start running a background thread to load the new
+        race data_
+
+        Return:
+            _int_: _exits method block if yearText or eventText has no value_
+        """
+        # grab the text value from the QCombo boxes within the session Selector UI element
+        yearText = self.yearSelector.currentText()
+        eventText = self.eventSelector.currentText()
+
+        # if empty exit
+        if not yearText or not eventText:
+            return 0 
+
+        # parsing the text into a dict
+        sessionInfoDict: dict = {"year": int(yearText), "event_name": eventText, "session_type": "Race", "downloaded" : not self.conectivityViewModel.isOnline}
+        # NOTE: debugging print statement remove in future issue
+        print(f'sessionInfoDict: {sessionInfoDict}')
+        # call sessionSelectorVM to start loading race data NOTE: Currently takes about 15 seconds to load on a intel i5 processor with 8G mem
+        self.sessionSelectorViewModel.onRaceSelected(sessionInfoDict= sessionInfoDict)
+
+    def __setAvailableYears(self) -> None:
+        """
+        _grabbing current year set from view model then sorting it to insure proper order, then add to yearSelector Combo Box UI element_
+        """
+        #print(f"home.py/__setAvailableYears : > attempting to set the session Selector Years value")
+        # sort years earliest to latest
+        years = sorted(self.sessionSelectorViewModel.currentYearSet)
+        # clear previous data before appending new data
+        self.yearSelector.clear()
+        for year in years:
+            self.yearSelector.addItem(str(year))
+
+    
+    def __setAvailableEvents(self, year: str) -> None:
+        """
+        set the eventSelector combobox depending on yearSelector text upon textActivated Signal update
+        """
+        yearInt = int(year)
+        eventList: list = []
+        # for each event in the available list put only the ones from selected year into event selector
+        for event in self.sessionSelectorViewModel.availableList:
+            if event["year"] == yearInt:
+                # grab even_name from session
+                eventName = event["event_name"]
+                # if eventName is not in the list add it to the list
+                if eventName not in eventList:
+                    eventList.append(eventName)
+        
+        # clear and append items to selector combo box
+        self.eventSelector.clear()
+        self.eventSelector.addItems(eventList)
+
+    # NOTE: future implementation because the code in loadsessionintodb doesn't dynamically allow any session type only race 
+    def __setAvailableSessions(self, year: str, event: str) -> None:
+        """_set the sessionSelector combobox depending on year and event when eventSelector combox sends Signal update
+
+        Args:
+            year (str): _specified year used to search for available sessions_
+            event (str): specified event used to search for available sessions
+        """
+        print("attempt to grab available sessions")
+        
+    def __onConnectionChange(self, isOnline: bool):
+        """_updates the text of connectionLabel depending on if user has internet connection_
+
+        Args:
+            isOnline (bool): _value coming from a signal update from conectivityVM_
+        """
+        if isOnline:
+            self.connectionLabel.setText("Online")
+            self.connectionLabel.setStyleSheet(f"color: {theme.success}")
+        else:
+            self.connectionLabel.setText("Offline")
+            self.connectionLabel.setStyleSheet(f"color: {theme.danger}")

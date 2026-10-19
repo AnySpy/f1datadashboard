@@ -5,6 +5,12 @@ from Services.dbhandler import DBhandler
 import pandas as pd
 from fastf1.events import EventSchedule
 
+"""
+    TODO: 
+        - If f1cache contains > 5 items delete last used item
+"""
+
+fastf1.logger.set_log_level("DEBUG")
 
 def get_schedule_by_year(year: int, testing: bool = False) -> EventSchedule:
     """When passed a year as an int, will return the name of the events.
@@ -31,10 +37,12 @@ def get_race(year: int, event_name: str, type: str = "R") -> None:
         type (str, optional): What type of race to grab. Types: 'FP1', 'FP2', 'FP3', 'Q', 'R'. Defaults to "R".
     """
     handler = DBhandler()
+    new_session_id = None
     try:
-        handler.loadSessionIntoDB(fastf1.get_session(year, event_name, type))
+        new_session_id = handler.loadSessionIntoDB(fastf1.get_session(year, event_name, type))
     finally:
         handler.close()
+        return new_session_id
 
 
 # Helper/Debug Functions
@@ -48,7 +56,6 @@ def _get_event_names(schedule: EventSchedule) -> pd.Series | None:
         _type_: _description_
     """
     return schedule.get("EventName")
-
 
 def _main():
     get_race(2026, "Japanese Grand Prix", "R")

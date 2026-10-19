@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject, Signal
 from Services.dbhandler import DBhandler
 from ViewModels.raceSimulationVM import PlayControlsVM
+from ViewModels.sessionSelectorVM import SessionSelectorVM
 class TrackStatusVM(QObject):
     """
     TODO:
@@ -23,21 +24,20 @@ class TrackStatusVM(QObject):
     def updatedTrackSurface(self):
         return self.__updatedTrackSurface
 
-    def __init__(self, playControlsVM: PlayControlsVM):
+    def __init__(self, playControlsVM: PlayControlsVM, sessionSelectorVM: SessionSelectorVM):
         super().__init__()
         # on init set Signals and class vars to normal
         self.currentTrackSafety: str = "session data not loaded..."
         self.currentTrackSurface = "normal"
         # NOTE: This won't be accurate once entry_id's are deleted and re-inserted we should propbably change entry_id search to table_index search
         self.currentIndex: int = 1
-        # update this whenever sessionSelector VM sends a signal to update
-        self.currentSessionId: int = 1
         # NOTE: flagged for depreciation once playcontrolsVM updates all viewModels
         self.currentTime: float = 0.00
         # bounds for the current status 
         self.lastStatusChangeTime: float | None = 0.0
         self.nextStatusChangeTime: float | None = 0.0
         self.playControlsVM = playControlsVM
+        self.sessionSelectorVM = sessionSelectorVM
         # on playcontrol _tick for clock run _onCurrentTimeChange function
         self.playControlsVM.updatedTime.connect(self._onCurrentTimeChange)
 
@@ -72,7 +72,7 @@ class TrackStatusVM(QObject):
             _float_: _time of next status change in seconds_
             _float_: _float representation of infinity if there is no next row, this can be used as an end-flag for sessionID_
         """
-        row = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy="entry_id", searchData= entryID + 1, attributeNameTuple=("time",), sessionID= self.currentSessionId)
+        row = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy="entry_id", searchData= entryID + 1, attributeNameTuple=("time",), sessionID= self.sessionSelectorVM.currentSessionID)
         if(row != None):
             # next change time for track status
             return row[0]
@@ -131,29 +131,20 @@ class TrackStatusVM(QObject):
         columns = ("entry_id", "session_id", "time", "track_safety_status", "message")
         # fetch status from DB
         #creates a tuple to search through
-        newStatus = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= searchBy, searchData= searchData, attributeNameTuple= columns, sessionID= self.currentSessionId)
+        newStatus = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= searchBy, searchData= searchData, attributeNameTuple= columns, sessionID= self.sessionSelectorVM.currentSessionID)
 
         # ! newStatus being None is causing a CTD. This needs to be handled elegantly in the future.
+        """
         if newStatus is None:
             return None
-
         """
-
-        NOTE: Believe the _getNextStatusChange fixes below issue
-        # stub value need to wright a try except block for getting data from db
-        #grab next change time from table status
-        nextChangeTuple = self.dbHandler.getDataFromTable(tableName= "trackStatus", searchBy= "entry_id", searchData=newStatus[0] + 1, attributeNameTuple= ("time", ), sessionID= self.currentSessionId)
-
         
-        if nextChangeTuple is None:
-            return None
-        """
+
         # set data to idle
         if(newStatus == None):
             self.setSafetyStatus("Idle")
             self.lastStatusChangeTime = 0.00
-            # NOTE: find first index of session | write a function to find this 
-            self.currentIndex = 0 # start fo session 
+            self.currentIndex = self.dbHandler.getFirstIndexOfTrackStatus() # start of session 
             self.nextStatusChangeTime = self._getNextChangeTime(self.currentIndex)
         else:
             #grab next change time from table status
@@ -169,4 +160,3 @@ class TrackStatusVM(QObject):
         # newStatus = dbHandler.getSafetyStatus()
         # stub value need to wright a try except block for getting data from db
         self.setSurfaceStatus("test")
-

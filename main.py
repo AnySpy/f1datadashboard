@@ -15,12 +15,12 @@ NOTE: are we placing these to 'high' are we allowing too many objects to view th
 from ViewModels.driverProfilesVM import DriverProfilesViewModel
 from ViewModels.raceSimulationVM import PlayControlsVM
 from ViewModels.trackStatusVM import TrackStatusVM
-
+from ViewModels.sessionSelectorVM import SessionSelectorVM
+from ViewModels.connectivityVM import ConnectivityVM
 # import dbhandler
 from Services.dbhandler import DBhandler
 from Services.database import create_schema
 from Services.api_handler import get_race
-
 """
 Global Vars
 """
@@ -38,19 +38,17 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("F1 Data Analysis")
         self.dbHandler = DBhandler()
         #instantiate the VMs
+        self.conectivityVM = ConnectivityVM()
         self.driverProfilesVM = DriverProfilesViewModel()
-        
-        self.playControlsVM = PlayControlsVM()
-        self.trackStatusVM = TrackStatusVM(playControlsVM = self.playControlsVM)
+        self.sessionSelectorVM = SessionSelectorVM(conectivityModel= self.conectivityVM)
+        self.playControlsVM = PlayControlsVM(sessionSelectorVM= self.sessionSelectorVM)
+        self.trackStatusVM = TrackStatusVM(playControlsVM = self.playControlsVM, sessionSelectorVM=self.sessionSelectorVM)
         # set the main container
         mainContainer = QWidget()
         self.setCentralWidget(mainContainer)
-        #
         # initialize all view models
-        #
         # create initialize track status view model
         # self.monitorTrackStatus = TrackStatusVM()
-
         # make the layout horizontal
         mainContainerLayout = QHBoxLayout(mainContainer)
 
@@ -60,7 +58,7 @@ class MainWindow(QMainWindow):
         # create the main elements and pass down the switch page function
         self.sidebar = Sidebar(self.switch_page)
         # changed the 1st self to try to pass down currentPageIndx
-        self.home = HomePage(trackStatusViewModel = self.trackStatusVM, playControlsViewModel = self.playControlsVM)
+        self.home = HomePage(trackStatusViewModel = self.trackStatusVM, playControlsViewModel = self.playControlsVM, sessionSelectorViewModel= self.sessionSelectorVM, conectivityViewModel= self.conectivityVM)   
         self.settings = GraphCanvasContainer()
         # Removed the dbHandler object since the UI shouldn't be exposed to it (traditionally). If there's a reason it was here,
         self.driverProfiles = DriverProfiles(self.driverProfilesVM)

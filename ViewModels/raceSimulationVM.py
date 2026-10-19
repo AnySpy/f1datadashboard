@@ -1,6 +1,6 @@
 from PySide6.QtCore import QObject, Signal, QTimer
 from Services.dbhandler import DBhandler
-
+from ViewModels.sessionSelectorVM import SessionSelectorVM
 class DriverStandingsVM(QObject):
     """_summary_
 
@@ -119,7 +119,7 @@ class PlayControlsVM(QObject):
     # this should probably be a property of play controls it will need to listen to changes
     updatedPlayingStatus = Signal(bool)
     # used to display time on play back slider
-    def __init__(self):
+    def __init__(self, sessionSelectorVM: SessionSelectorVM):
         super().__init__()
         self.__isPlaying: bool = False
         self.currentTime:float = 0.00
@@ -127,6 +127,7 @@ class PlayControlsVM(QObject):
         self.playBackSpeed: int = 1
         # read only 
         self.dbhandler = DBhandler()
+        self.sessionSelectorVM = sessionSelectorVM
         # create timer
         self.timer = QTimer(self)
         # set interval to 1000ms or 1 second smallest measurement we need
@@ -136,6 +137,7 @@ class PlayControlsVM(QObject):
         self.timer.timeout.connect(self.__tick)
         # NOTE: on application start we will want to change this VM to a paused start to begin
         # self.timer.start()
+        self.sessionSelectorVM.currentSessionIDChanged.connect(self.fetchRaceDuration)
 
 
     def __tick(self):
@@ -178,7 +180,7 @@ class PlayControlsVM(QObject):
         self.currentTime = newCurrentTime
         self.updatedTime.emit(newCurrentTime)
         
-    def fetchRaceDuration(self, sessionID: int = 1) -> float:
+    def fetchRaceDuration(self, newSessionID: int = 1) -> float:
         """
         _grabs the current session duration from session table in database_
 
@@ -188,7 +190,7 @@ class PlayControlsVM(QObject):
         NOTE: 
             in future make this handle getting data via getDataFromTable
         """
-        totalDuration = self.dbhandler.getSessionTime(sessionID)
+        totalDuration = self.dbhandler.getSessionTime(newSessionID)
 
         # might need to handle if the value is None
         if totalDuration is None:

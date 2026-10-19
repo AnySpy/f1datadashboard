@@ -4,6 +4,7 @@ import sqlite3
 import fastf1
 import pandas as pd
 from fastf1.events import Session
+import traceback
 
 """
 dbhandler.py — the ONE place the app talks to the database.
@@ -12,6 +13,10 @@ Everything that used to live in Services/database.py (creating the schema,
 loading a FastF1 session into the tables, previewing them) is now a method on
 DBhandler. Services/database.py still exists as a thin wrapper so older code
 that imports from it keeps working.
+
+TODO: 
+    - loadsessionintodb only loads session5 into the db of a specified event
+    - need to update table functions to reflect changes in sessionSelector
 """
 
 os.makedirs("f1_cache", exist_ok=True)
@@ -35,25 +40,23 @@ def _to_text(value):
     """NaN / None / "" -> None, otherwise a string"""
     return None if pd.isna(value) or str(value).strip() == "" else str(value)
 
+def _to_seconds(value):
+    return None if pd.isna(value) else value.total_seconds()
 
 def calculateTotalSessionTime(session: Session) -> float:
-    """Time | pd.Timedelta | The drivers total race time
-    (values only given if session is ‘Race’, ‘Sprint’, ‘Sprint Shootout’ or
-    ‘Sprint Qualifying’ >and the driver was not more than one lap behind
-    the leader
+    """_helper function to calculate the total session time based off of session flags_
 
     Args:
-        session_id (int): _description_
+        session (fastf1.events.Session): _fastf1 session being loaded_
 
     Returns:
-        float: _description_
+        float: _total time in seconds_
     """
     # can I just pass the memory location so I don't have to load it again
     # this makes a new DF
     newSessionStatus = session.session_status
     print(newSessionStatus)
     # this is when the start flag is raised so when drivers start racing
-    # NOTE: This will need to be sent to trackStatus and PlayControls VMs to insure proper alignment
     # NOTE: will need to handle an error that comes up when status doesn't have a 'Ends' signal
     dataStreamStart = (
         (newSessionStatus.loc[newSessionStatus["Status"] == "Inactive", "Time"])
@@ -246,6 +249,7 @@ class DBhandler:
         self.conn.commit()
 
     def _createTables(self, conn: sqlite3.Connection) -> None:
+
         """Runs every CREATE TABLE IF NOT EXISTS on the given connection."""
         cur = conn.cursor()
 
@@ -256,7 +260,7 @@ class DBhandler:
             _____________________________________________________________________________________
             |session_id| year |    event_name    |    session_type   | total_laps|  total_time  |
             _____________________________________________________________________________________
-            |   1      | 2026 | japan grand prix |                   |     57    |  10000.52    | example data
+            |   1      | 2026 | japan grand prix |        R           |     57    |  10000.52    | example data
             _____________________________________________________________________________________
     
             NOTE: 
@@ -272,6 +276,7 @@ class DBhandler:
             session_type TEXT NOT NULL,
             total_laps INTEGER,
             total_time FLOAT NOT NULL,
+            track_rotation REAL, 
             UNIQUE(year, event_name, session_type)
         )
         """)
@@ -291,6 +296,8 @@ class DBhandler:
             track_status TEXT,
             is_pit_lap INTEGER,
             position INTEGER,
+            lap_start_time REAL,
+            lap_end_time REAL,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
         )
         """)
@@ -404,10 +411,118 @@ class DBhandler:
         )
         """)
 
-        conn.commit()
+        # live telemetry (merged car_telemetry and driver_telemetry) this will reduce the amount of obeservations within the db. 
+        # should help the total file size of the db file
+        """
+            NOTE: what data do we need in the db?
+                - Distance _float_ : distance driven in meters (could be used to estimate tire life)
+                - DriverAhead _str_ : driver number of the driver ahead of car (might not need this, we already have position data from laps)
+                - Distance to Driver ahead _float_ : this could be important to change the rate at which the canvas updates
+                - z_pos _float_: could be important if we want to calculate driver speed and torque, or make a 3d model
+                - drs _int_ : this could help us detect if the driver is slowing down or if the driver is taking a turn or if the user is speeding up
+                - date_timestamp _DATETIME_: this could be used to insure the track canvas is properly is aligned.
+        """
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS live_driver_telemetry (
+            session_id INTEGER NOT NULL,
+            driver_code TEXT NOT NULL,
+            session_time REAL NOT NULL,
+            source_of_data TEXT NOT NULL,
+            status TEXT NOT NULL,
+            x_pos REAL NOT NULL,
+            y_pos REAL NOT NULL,
+            distance_to_driver_ahead FLOAT,
+            gear INTEGER,
+            throttle REAL,
+            brake INTEGER,
+            drs INTEGER,
+            SPEED REAL,
+            rpm REAL,
+            PRIMARY KEY (session_id, driver_code, session_time)
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+            )
 
-    def loadSessionIntoDB(self, session: Session) -> None:
-        """Provided a session, will insert the session data into the database
+
+        """)
+        # table schema for circuit_corners_data
+        # NOTE: this is for draw the track simulation. need corner data for some of the funcitons
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS circuit_corners_data (
+            session_id INTEGER NOT NULL,
+            corner_number INTEGER NOT NULL, 
+            letter TEXT NOT NULL DEFAULT '',
+            x_pos REAL NOT NULL, 
+            y_pos REAL NOT NULL, 
+            angle REAL,
+            PRIMARY KEY (session_id, corner_number, letter),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+        )
+        """)
+
+        conn.commit()
+   
+    # Limiter for the telemetry step will skip _ rows in the telemetry
+    def _insertTelemetry(self, session: Session, session_id: int, step: int = 2) -> None:
+        """
+            _parses data from merged car telemetry and pos telemetry data, then inserts rows into live_driver_telemetry table_
+
+            Args:
+                session (Session): _fastf1 session_
+                session_id (int): _id of session data being inserted into db_
+                step (int): _the step amount for data wanting to be kept_
+        """
+        # connect to the cursor
+        conn = self.conn
+        cur = conn.cursor()
+        # for each driver collect telemetry session.driver is organized by driver_num but our db stores driver abreviation
+        for driver_num in session.drivers:
+            # get driver code from driver number 
+            driver_code = session.get_driver(driver_num)["Abbreviation"]
+            print(f'fetching telemetry for {driver_num},{driver_code}')
+            # try to merge car data with position data 
+            try: 
+                telem = session.car_data[driver_num].merge_channels(session.pos_data[driver_num])
+            except Exception:
+                # if there is an issue with merging the data print out a traceback for debugging purposes
+                traceback.print_exc()
+                # don't let the app crash 
+                continue
+
+            # if x or y is NaN remove that row NOTE: we have to have x and y to plot on the graph
+            telem = telem.dropna(subset=["X","Y"])
+            # limit the amount of rows in the db set to every other row 
+            telem = telem.iloc[::step]
+
+            # create a data frame with the data
+            df = pd.DataFrame({
+                "session_id": session_id,
+                "driver_code": driver_code,
+                "session_time": telem["SessionTime"].dt.total_seconds(),
+                "source": telem["Source"].fillna("unkown source") if "Source" in telem else "No Source Logged",
+                "status": telem["Status"].fillna("unkown driver status") if "Status" in telem else "No Source Logged",
+                "x": telem["X"].astype(float),
+                "y": telem["Y"].astype(float),
+                "ahead": None,   # see note below
+                "gear": telem["nGear"],
+                "throttle": telem["Throttle"],
+                "brake": telem["Brake"].astype(int),
+                "drs": telem["DRS"],
+                "speed": telem["Speed"],
+                "rpm": telem["RPM"],
+            })
+            # turn it into tuples autofill any NaN values into None, don't add an index
+            dfRow = df.astype(object).where(df.notna(), None).itertuples(index = False, name = None)
+            cur.executemany(
+                """INSERT OR IGNORE INTO live_driver_telemetry
+                (session_id, driver_code, session_time, source_of_data, status,
+                x_pos, y_pos, distance_to_driver_ahead, gear, throttle, brake, drs, speed, rpm)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                dfRow,
+            )
+
+    def loadSessionIntoDB(self, session: Session) -> int:
+        print("loadingSessionNow")
+        """_Provided a session, will insert the session data into the database_
 
         Args:
             session (Session): A session object from the fastf1 API.
@@ -418,8 +533,8 @@ class DBhandler:
         cur = conn.cursor()
 
         # this creates a property called by session.track_status also
-        session.load()
-
+        session.load(telemetry = True)
+        
         laps = session.laps.copy()
         weather = session.weather_data.copy()
         results = session.results.copy()  # has driver code, name, team, number, color
@@ -430,7 +545,7 @@ class DBhandler:
         trackStatusDF = session.track_status.copy()
         raceControlDF = session.race_control_messages.copy()
         # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
-        # - yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
+        # TODO: yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
         session_type = session.event.Session5
         session_time = calculateTotalSessionTime(session)
         # Insert into sessions table (or get existing session_id if already loaded)
@@ -450,8 +565,6 @@ class DBhandler:
         """,
             (total_laps, session_time, year, event, session_type),
         )
-        conn.commit()
-
         cur.execute(
             """
             SELECT session_id FROM sessions
@@ -464,7 +577,7 @@ class DBhandler:
         # Reloading a race used to insert its laps/weather/trackStatus rows a
         # second time (those tables have no unique key). Clear this session's old
         # rows first so a reload replaces the data instead of duplicating it.
-        for table in ("laps", "weather", "trackStatus", "results", "raceControlMessages"):
+        for table in ("laps", "weather", "trackStatus", "results", "live_driver_telemetry", "circuit_corners_data", "raceControlMessages"):
             cur.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
 
         # Insert drivers
@@ -483,7 +596,6 @@ class DBhandler:
                     row.get("TeamColor"),
                 ),
             )
-        conn.commit()
 
         # Insert results
         for _, row in results.iterrows():
@@ -505,39 +617,45 @@ class DBhandler:
             )
 
         # Insert laps
-        for _, row in laps.iterrows():
+        # NOTE: changing laps.iterrows to laps.iterlaps so that I can call lap.get_telemetry
+        # NOTE: Future change update lap table to show sessionTime for each lap so I can compare to insure correctness of simulation
+        for _, lap in laps.iterlaps():
             lap_time = (
-                row["LapTime"].total_seconds() if pd.notna(row["LapTime"]) else None
+                lap["LapTime"].total_seconds() if pd.notna(lap["LapTime"]) else None
             )
-            # NOTE: timedelta doesn't provide the data I need remove before commit
-            lap_timedelta_str: str = str(row["LapTime"])
+            # NOTE: Keep this until I can gaurantee that the session is aligning correctly for the simulation
+            lap_timedelta_str: str = str(lap["LapTime"])
             is_pit = (
                 1
-                if (pd.notna(row.get("PitInTime")) or pd.notna(row.get("PitOutTime")))
+                if (pd.notna(lap.get("PitInTime")) or pd.notna(lap.get("PitOutTime")))
                 else 0
             )
             cur.execute(
                 """
                 INSERT INTO laps (session_id, driver, team, lap_number, lap_completion_timestamp, lap_time_seconds,
-                                   compound, tyre_life, track_status, is_pit_lap, position)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   compound, tyre_life, track_status, is_pit_lap, position, lap_start_time, lap_end_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     session_id,
-                    row.get("Driver"),
-                    row.get("Team"),
-                    row.get("LapNumber"),
+                    lap.get("Driver"),
+                    lap.get("Team"),
+                    lap.get("LapNumber"),
                     lap_timedelta_str,
                     lap_time,
-                    row.get("Compound"),
-                    row.get("TyreLife"),
-                    str(row.get("TrackStatus")),
+                    lap.get("Compound"),
+                    lap.get("TyreLife"),
+                    str(lap.get("TrackStatus")),
                     is_pit,
                     _to_int(
-                        row.get("Position")
+                        lap.get("Position")
                     ),  # race position at the end of this lap
+                    _to_seconds(lap.get("LapStartTime")),
+                    _to_seconds(lap.get("Time")),
                 ),
             )
+        # insert live_driver_telemetry
+        self._insertTelemetry(session = session, session_id= session_id)
 
         # Insert weather
         for _, row in weather.iterrows():
@@ -584,6 +702,28 @@ class DBhandler:
                 """,
                 (session_id, timeStampInSeconds, statusNumCode, message),
             )
+
+        # insert circuit_corners_data
+        circuitInfo = session.get_circuit_info()
+        cur.execute(
+            "UPDATE sessions SET track_rotation = ? WHERE session_id = ?",
+            (float(circuitInfo.rotation), session_id),
+        )
+
+        for _, circuit in circuitInfo.corners.iterrows():
+            if pd.isna(circuit["Letter"]):
+                letter = ""
+            else:
+                letter = str(circuit["Letter"])
+            cur.executemany(
+                """
+                INSERT INTO circuit_corners_data
+                (session_id, corner_number, letter, x_pos, y_pos, angle)
+                VALUES (?,?,?,?,?,?)
+                """,
+                [(session_id, int(circuit["Number"]), letter, float(circuit["X"]), float(circuit["Y"]), float(circuit["Angle"]))],
+            )
+        
         # Insert race-control messages
         for _, row in raceControlDF.iterrows():
             cur.execute(
@@ -614,6 +754,7 @@ class DBhandler:
             f"weather samples, and {len(raceControlDF)} race-control messages "
             f"for {year} {event} {session_type}"
         )
+        return session_id
 
     def previewDB(self) -> None:
         """Helper function to print out the database"""
@@ -636,6 +777,9 @@ class DBhandler:
         print(pd.read_sql("SELECT * FROM trackStatus", conn))
         print("\n--- Sample raceControlMessages ---")
         print(pd.read_sql("SELECT * FROM raceControlMessages LIMIT 10", conn))
+
+        print("--- Sample live_driver_telemetry ---")
+        print(pd.read_sql("SELECT * FROM live_driver_telemetry LIMIT 5", conn))
 
     # ------------------------------------------------------------------
     # Reading from the database
@@ -772,18 +916,18 @@ class DBhandler:
         print("dbhandler.py/_checkNames: Valid access to tables within database")
 
     # NOTE: Flagged for Depreciation
-    def getSessionID(self, tableName: str, searchIndex: int) -> int:
+    def getSessionID(self, tableName: str, year: int, eventName: str, sessionType: str) -> int:
         """
         _summary_: get the session_id of one row, looked up by entry_id
 
         Returns:
             _type_ int: the session_id, or -1 if the row doesn't exist
         """
-        self._checkNames(tableName, ("entry_id", "session_id"))
+        #self._checkNames(tableName, ("entry_id", "session_id"))
         cursor = self.conn.cursor()
         cursor.execute(
-            f"SELECT session_id FROM {tableName} WHERE entry_id = ? LIMIT 1",
-            (searchIndex,),
+            f"SELECT session_id FROM {tableName} WHERE year = ? AND event_name = ? AND session_type = ? LIMIT 1",
+            (year, eventName, sessionType),
         )
         sessionID = cursor.fetchone()
         if sessionID is None:
@@ -924,6 +1068,89 @@ class DBhandler:
         # NOTE: might be nice to return a dictionary so that it is easier to read from
         return results
 
+    def getSessionsFromDB(self) -> list[dict]:
+        cursor = self.conn.cursor()
+        attributes = ("year", "event_name", "session_type")
+        columns = ", ".join(attributes)
+
+        cursor.row_factory = sqlite3.Row
+        cursor.execute(
+            f"""
+                SELECT {columns} FROM sessions
+            """)
+        sessionTableDict: list[dict] = []
+        # for each row within the list append each to the dict based on their columnNames for keys
+        for row in cursor.fetchall():
+            rowDict = dict(row)
+            rowDict["downloaded"] = True
+            sessionTableDict.append(rowDict)
+            
+        # procecs the sessionTable and make it a list[dicts]
+        return sessionTableDict
+
+    # NOTE: rewrite this to be more standard compared to other getters
+    def getDriverPosData(self, session_id: int) -> pd.DataFrame:
+        """_return a dataframe with all of the position data from a session then order by driver and time_
+
+        Args:
+            session_id (int): _description_
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        return pd.read_sql_query(
+        """
+        SELECT driver_code, session_time, x_pos, y_pos
+        FROM live_driver_telemetry
+        WHERE session_id = ?
+        ORDER BY driver_code, session_time
+        """, self.conn, params=(session_id,),
+    )
+
+    def getFastestLapPositions(self, session_id: int) -> pd.DataFrame:
+        row = self.conn.execute(
+            """
+            SELECT driver, lap_start_time, lap_end_time 
+            FROM laps 
+            WHERE session_id = ? AND lap_time_seconds IS NOT NULL AND lap_start_time IS NOT NULL AND lap_end_time IS NOT NULL
+            ORDER BY lap_time_seconds ASC LIMIT 1
+            """,
+            (session_id,), ).fetchone()
+        if row is None:
+            return pd.DataFrame(columns=["X", "Y"])
+        driver, startTime, endTime = row
+        return pd.read_sql_query(
+            """ 
+            SELECT x_pos, y_pos
+            FROM live_driver_telemetry
+            WHERE session_id = ? AND driver_code = ? AND session_time BETWEEN ? AND ?
+            ORDER BY session_time
+            """,
+            self.conn, params =(session_id, driver, startTime, endTime),
+        )
+
+    def getCircuitRotation(self, session_id: int) -> float:
+        row = self.conn.execute(
+            "SELECT track_rotation FROM sessions WHERE session_id = ?",
+        (session_id,)
+        ).fetchone()
+        return float(row[0]) if row and row[0] is not None else 0.0
+
+    def getCorners(self, session_id:int) -> pd.DataFrame:
+        return pd.read_sql_query(
+            """
+            SELECT corner_number, letter, x_pos, y_pos, angle
+            FROM circuit_corners_data
+            WHERE session_id = ?
+            ORDER BY corner_number
+            """,
+            self.conn, params = (session_id, ),
+        )
+    
+    def __deleteSessionData(self, session_id:int) -> None:
+        """ 
+            _delete session data from the database to keep the total size of application down_
+        """
     # NOTE: Flagged for depreciation once moved to trackStatusVM
     def _getNextStatusChange(
         self, sessionID: int, entryID: int, time: float
@@ -936,9 +1163,6 @@ class DBhandler:
             _type_ None: there are no more changes -> this is the last one (endFlag)
         """
         cursor = self.conn.cursor()
-        print(
-            f"dbhandler.py/_getNextStatusChange: attempting to get the time at which the next status change happens within session {sessionID}"
-        )
         cursor.execute(
             """
             SELECT time FROM trackStatus
@@ -1042,8 +1266,25 @@ class DBhandler:
         # because speed is different for every driver
         return 0.00
 
+    def getFirstIndexOfTrackStatus(self, session_id: int) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT entry_id 
+            FROM trackStatus 
+            WHERE session_id = ? 
+            ORDER BY time ASC, entry_id ASC 
+            LIMIT 1
+            """, 
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row is not None else -1
 
 def main():
+    dbHandler = DBhandler()
+    dbHandler.loadSessionIntoDB(fastf1.get_session(2026, "Japanese Grand Prix", "R"))
+    dbHandler.getSessionsFromDB()
     return 0
 
 
