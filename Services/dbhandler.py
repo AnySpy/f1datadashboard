@@ -165,6 +165,19 @@ ALLOWED_COLUMNS: dict = {
         "points",
         "status",
     },
+    "raceControlMessages": {
+        "message_id",
+        "session_id",
+        "time",
+        "category",
+        "message",
+        "status",
+        "flag",
+        "scope",
+        "sector",
+        "racing_number",
+        "lap",
+    },
 }
 
 # Tables that have a numeric elapsed-time column (seconds) we can search by.
@@ -357,6 +370,26 @@ class DBhandler:
         )
         """)
 
+        # Race control messages — FIA/F1 messages issued during a session.
+        # Examples include yellow/green flags, safety-car notices, pit-lane
+        # messages, investigations, penalties, and other control messages.
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS raceControlMessages (
+            message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            time TEXT,
+            category TEXT,
+            message TEXT,
+            status TEXT,
+            flag TEXT,
+            scope TEXT,
+            sector INTEGER,
+            racing_number TEXT,
+            lap INTEGER,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+        )
+        """)
+
         # Results table — the official race result, one row per driver per session.
         # Feeds the "placement over time" graph (#44) and race outcome prediction (#42).
         # grid_position 0 = started from the pit lane.
@@ -509,6 +542,7 @@ class DBhandler:
         event = session.event.EventName
         # copy data from session.track_status
         trackStatusDF = session.track_status.copy()
+        raceControlDF = session.race_control_messages.copy()
         # ? Session5 is the race event. Do we care about practices and qualifiers? If so, we need to handle that.
         # TODO: yes because we could add a graph to show starting position diffentials vs where drivers started at the beginning of practices
         session_type = session.event.Session5
@@ -542,7 +576,7 @@ class DBhandler:
         # Reloading a race used to insert its laps/weather/trackStatus rows a
         # second time (those tables have no unique key). Clear this session's old
         # rows first so a reload replaces the data instead of duplicating it.
-        for table in ("laps", "weather", "trackStatus", "results", "live_driver_telemetry", "circuit_corners_data"):
+        for table in ("laps", "weather", "trackStatus", "results", "live_driver_telemetry", "circuit_corners_data", "raceControlMessages")
             cur.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
 
         # Insert drivers
@@ -689,10 +723,35 @@ class DBhandler:
                 [(session_id, int(circuit["Number"]), letter, float(circuit["X"]), float(circuit["Y"]), float(circuit["Angle"]))],
             )
         
+        # Insert race-control messages
+        for _, row in raceControlDF.iterrows():
+            cur.execute(
+                """
+                INSERT INTO raceControlMessages (
+                    session_id, time, category, message, status, flag,
+                    scope, sector, racing_number, lap
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    _to_text(row.get("Time")),
+                    _to_text(row.get("Category")),
+                    _to_text(row.get("Message")),
+                    _to_text(row.get("Status")),
+                    _to_text(row.get("Flag")),
+                    _to_text(row.get("Scope")),
+                    _to_int(row.get("Sector")),
+                    _to_text(row.get("RacingNumber")),
+                    _to_int(row.get("Lap")),
+                ),
+            )
+
         conn.commit()
         print(
-            f"Loaded {len(results)} drivers, {len(laps)} laps, and {len(weather)} "
-            f"weather samples for {year} {event} {session_type}"
+            f"Loaded {len(results)} drivers, {len(laps)} laps, {len(weather)} "
+            f"weather samples, and {len(raceControlDF)} race-control messages "
+            f"for {year} {event} {session_type}"
         )
         return session_id
 
@@ -715,6 +774,8 @@ class DBhandler:
         )
         print("\n --- Sample trackStatus ---")
         print(pd.read_sql("SELECT * FROM trackStatus", conn))
+        print("\n--- Sample raceControlMessages ---")
+        print(pd.read_sql("SELECT * FROM raceControlMessages LIMIT 10", conn))
 
         print("--- Sample live_driver_telemetry ---")
         print(pd.read_sql("SELECT * FROM live_driver_telemetry LIMIT 5", conn))
@@ -726,6 +787,94 @@ class DBhandler:
     def close(self) -> None:
         """closes the database connection"""
         self.conn.close()
+
+    def getLapPositions(self, sessionID: int) -> dict[str, dict]:
+        """Every driver's race position on every lap of one session.
+        Feeds the Placement over Time graph (#44).
+
+        Args:
+            sessionID (int): which race (sessions.session_id)
+
+        Returns:
+            dict[str, dict]: keyed by driver code, each value contains
+                laps, positions, team, color, full_name, grid, finish,
+                classified, and status.
+        """
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT d.driver_code, d.full_name, d.team, d.color,
+                   r.grid_position, r.finish_position,
+                   r.classified_position, r.status
+            FROM drivers d
+            LEFT JOIN results r
+                   ON r.session_id = d.session_id
+                  AND r.driver_code = d.driver_code
+            WHERE d.session_id = ?
+            """,
+            (sessionID,),
+        )
+
+        drivers: dict[str, dict] = {}
+
+        for (
+            code,
+            name,
+            team,
+            color,
+            grid,
+            finish,
+            classified,
+            status,
+        ) in cursor.fetchall():
+            drivers[code] = {
+                "full_name": name,
+                "team": team,
+                "color": (
+                    f"#{color}"
+                    if color and not str(color).startswith("#")
+                    else color
+                ),
+                "grid": grid,
+                "finish": finish,
+                "classified": classified,
+                "status": status,
+                "laps": [],
+                "positions": [],
+            }
+
+        cursor.execute(
+            """
+            SELECT driver, lap_number, position
+            FROM laps
+            WHERE session_id = ?
+              AND position IS NOT NULL
+            ORDER BY driver, lap_number
+            """,
+            (sessionID,),
+        )
+
+        for code, lap, position in cursor.fetchall():
+            if code not in drivers:
+                continue
+
+            drivers[code]["laps"].append(int(lap))
+            drivers[code]["positions"].append(int(position))
+
+        fieldSize = len(drivers)
+
+        for info in drivers.values():
+            if info["laps"] and info["grid"] is not None:
+                grid = info["grid"] if info["grid"] > 0 else fieldSize
+                info["laps"].insert(0, 0)
+                info["positions"].insert(0, grid)
+
+        return {
+            code: info
+            for code, info in drivers.items()
+            if info["laps"]
+        }
 
     def getKnownDrivers(self) -> dict[str, str]:
         """Returns a list of every driver that has been recorded in the database
