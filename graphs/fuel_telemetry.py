@@ -17,31 +17,30 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+# Use the database in the root of the project.
 DB_PATH = Path(__file__).resolve().parents[1] / "f1_data.db"
 
-# Simplified fuel model from the existing project.
+# Simplified fuel-flow constant from the project's existing model.
+# This is an assumption, not a measured F1 fuel-consumption rate.
 MAX_FUEL_FLOW_KG_S = 1.0 / 36.0
 
-# Do not estimate through long gaps in telemetry.
+# Avoid estimating fuel consumption across missing telemetry intervals.
 MAX_SAMPLE_GAP_SECONDS = 10.0
 
 
-def load_driver_telemetry(
-    session_id: int,
-    driver_code: str,
-    db_path=DB_PATH,
-) -> pd.DataFrame:
-    """Load throttle telemetry for a driver and race session."""
+def load_driver_telemetry(session_id: int, driver_code: str, db_path=DB_PATH) -> pd.DataFrame:
+    """Load throttle readings for one driver in a selected session.
 
+    Returns session timestamps and throttle values from the telemetry table.
+    The database must already contain imported telemetry for this session.
+    """
     db_path = Path(db_path)
 
     if not db_path.is_file():
-        raise FileNotFoundError(
-            f"Database not found: {db_path}"
-        )
+        raise FileNotFoundError(f"Database not found: {db_path}")
 
+    # Read the existing telemetry table without modifying database records.
     with closing(sqlite3.connect(str(db_path))) as conn:
-
         table_exists = conn.execute(
             """
             SELECT 1
@@ -57,6 +56,8 @@ def load_driver_telemetry(
                 "Dylan's telemetry integration is required."
             )
 
+        # Parameterized SQL prevents user-provided values from altering the query.
+        # Ordering by session_time is required for time-based fuel estimation.
         telemetry = pd.read_sql_query(
             """
             SELECT session_time, throttle
@@ -71,55 +72,44 @@ def load_driver_telemetry(
 
     if telemetry.empty:
         raise ValueError(
-            f"No telemetry available for {driver_code} "
-            f"in session {session_id}."
+            f"No telemetry available for {driver_code} in session {session_id}."
         )
 
     return telemetry
 
 
 def estimate_remaining_fuel(
-    telemetry: pd.DataFrame,
-    initial_fuel_kg: float = 110.0,
+    telemetry: pd.DataFrame, initial_fuel_kg: float = 110.0
 ) -> pd.DataFrame:
-    """Calculate illustrative remaining-fuel estimates."""
+    """Estimate remaining fuel from throttle and elapsed session time.
 
+    Uses a simplified throttle-based flow model and trapezoidal integration.
+    Results are illustrative estimates rather than real fuel measurements.
+    """
+    # The initial fuel value is configurable, but limited to 110 kg.
     if not 0 < initial_fuel_kg <= 110:
-        raise ValueError(
-            "Initial fuel must be between 0 and 110 kg."
-        )
+        raise ValueError("Initial fuel must be between 0 and 110 kg.")
 
     required = {"session_time", "throttle"}
 
     if not required.issubset(telemetry.columns):
-        raise ValueError(
-            "Missing session_time or throttle column."
-        )
+        raise ValueError("Missing session_time or throttle column.")
 
-    data = telemetry[
-        ["session_time", "throttle"]
-    ].copy()
+    # Work on a copy to avoid modifying the original telemetry DataFrame.
+    data = telemetry[["session_time", "throttle"]].copy()
 
-    data["session_time"] = pd.to_numeric(
-        data["session_time"],
-        errors="coerce",
-    )
-
-    data["throttle"] = pd.to_numeric(
-        data["throttle"],
-        errors="coerce",
-    )
+    # Convert values to numbers so invalid input can be detected.
+    data["session_time"] = pd.to_numeric(data["session_time"], errors="coerce")
+    data["throttle"] = pd.to_numeric(data["throttle"], errors="coerce")
 
     if data.isna().any().any():
-        raise ValueError(
-            "Telemetry contains missing or invalid values."
-        )
+        raise ValueError("Telemetry contains missing or invalid values.")
 
+    # FastF1 represents throttle position as a percentage from 0 to 100.
     if not data["throttle"].between(0, 100).all():
-        raise ValueError(
-            "Throttle must be between 0 and 100."
-        )
+        raise ValueError("Throttle must be between 0 and 100.")
 
+    # Ensure chronological ordering and retain one reading per timestamp.
     data = (
         data.sort_values("session_time")
         .drop_duplicates("session_time", keep="last")
@@ -127,81 +117,69 @@ def estimate_remaining_fuel(
     )
 
     if len(data) < 2:
-        raise ValueError(
-            "At least two telemetry samples are required."
-        )
+        raise ValueError("At least two telemetry samples are required.")
 
-    # Time difference between telemetry measurements.
-    data["delta_time_s"] = (
-        data["session_time"].diff().fillna(0.0)
-    )
+    # Calculate the actual elapsed time between consecutive measurements.
+    data["delta_time_s"] = data["session_time"].diff().fillna(0.0)
 
-    if (
-        data["delta_time_s"] > MAX_SAMPLE_GAP_SECONDS
-    ).any():
+    # Large telemetry gaps would make the fuel estimate unreliable.
+    if (data["delta_time_s"] > MAX_SAMPLE_GAP_SECONDS).any():
         raise ValueError(
             "Telemetry gap exceeds 10 seconds. "
             "Cannot estimate across missing data."
         )
 
-    # FastF1 throttle values use 0-100.
-    # Our simplified fuel model uses 0-1.
+    # Normalize throttle from 0-100 percent to a 0-1 fraction.
     throttle_fraction = data["throttle"] / 100.0
 
-    # Illustrative fuel flow in kg/second.
-    data["fuel_rate_kg_s"] = (
-        throttle_fraction ** 2
-    ) * MAX_FUEL_FLOW_KG_S
+    # Estimate instantaneous fuel flow using the existing simplified model.
+    # Fuel flow (kg/s) = (normalized throttle ** 2) / 36.
+    data["fuel_rate_kg_s"] = (throttle_fraction ** 2) * MAX_FUEL_FLOW_KG_S
 
-    # Average fuel flow between consecutive samples.
+    # Use the average of two neighboring fuel rates (trapezoidal integration)
+    # instead of assuming a constant rate over the entire interval.
     average_rate = (
-        data["fuel_rate_kg_s"]
-        + data["fuel_rate_kg_s"].shift(1)
+        data["fuel_rate_kg_s"] + data["fuel_rate_kg_s"].shift(1)
     ) / 2.0
 
+    # Fuel consumed in each interval = average flow rate * elapsed seconds.
     data["fuel_used_kg"] = (
         average_rate * data["delta_time_s"]
     ).fillna(0.0)
 
-    data["cumulative_fuel_used_kg"] = (
-        data["fuel_used_kg"].cumsum()
-    )
+    # Add interval consumption to estimate the total fuel used so far.
+    data["cumulative_fuel_used_kg"] = data["fuel_used_kg"].cumsum()
 
+    # Subtract estimated consumption from the assumed starting fuel.
+    # Prevent estimates from falling below zero kilograms.
     data["estimated_remaining_fuel_kg"] = (
-        initial_fuel_kg
-        - data["cumulative_fuel_used_kg"]
+        initial_fuel_kg - data["cumulative_fuel_used_kg"]
     ).clip(lower=0.0)
 
+    # Start the graph timeline at zero, regardless of session timestamp.
     data["elapsed_seconds"] = (
-        data["session_time"]
-        - data["session_time"].iloc[0]
+        data["session_time"] - data["session_time"].iloc[0]
     )
 
     return data
 
 
 def plot_estimated_fuel(
-    session_id: int,
-    driver_code: str,
-    initial_fuel_kg: float = 110.0,
-    db_path=DB_PATH,
+    session_id: int, driver_code: str,
+    initial_fuel_kg: float = 110.0, db_path=DB_PATH
 ):
-    """Generate a line graph of estimated remaining fuel."""
-
+    """Generate a line graph of estimated remaining fuel over time."""
+    # Load telemetry for the selected driver, then estimate fuel remaining.
     telemetry = load_driver_telemetry(
-        session_id=session_id,
-        driver_code=driver_code,
-        db_path=db_path,
+        session_id=session_id, driver_code=driver_code, db_path=db_path
     )
 
     fuel_data = estimate_remaining_fuel(
-        telemetry=telemetry,
-        initial_fuel_kg=initial_fuel_kg,
+        telemetry=telemetry, initial_fuel_kg=initial_fuel_kg
     )
 
-    elapsed_minutes = (
-        fuel_data["elapsed_seconds"] / 60.0
-    )
+    # Minutes are easier to interpret than raw seconds on the graph.
+    elapsed_minutes = fuel_data["elapsed_seconds"] / 60.0
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -212,6 +190,7 @@ def plot_estimated_fuel(
         label=f"{driver_code.upper()} - Estimated Fuel",
     )
 
+    # Clearly label the results as estimates, not measured fuel levels.
     ax.set_title(
         f"Estimated Fuel Remaining - {driver_code.upper()}\n"
         f"Session {session_id} | Simplified throttle model"
@@ -219,14 +198,13 @@ def plot_estimated_fuel(
 
     ax.set_xlabel("Elapsed telemetry time (minutes)")
     ax.set_ylabel("Estimated remaining fuel (kg)")
-
     ax.set_ylim(0, initial_fuel_kg * 1.05)
 
     ax.grid(True, alpha=0.3)
     ax.legend()
-
     fig.tight_layout()
 
+    # Return the graph and calculated data for reuse or automated testing.
     return fig, ax, fuel_data
 
 
