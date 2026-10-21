@@ -1,13 +1,13 @@
 import sys
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
-from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame
+from PySide6.QtWidgets import QHBoxLayout, QWidget, QVBoxLayout, QPushButton, QFrame, QLabel
 from PySide6.QtGui import QPalette, Qt
 
 from UI.home import HomePage
 from UI.dataAnalysisPage import GraphCanvasContainer
 from UI.driverProfiles import DriverProfiles
-
+from UI.login import LoginPage
 # Import VMs
 """
 NOTE: are we placing these to 'high' are we allowing too many objects to view these VM's
@@ -21,6 +21,8 @@ from ViewModels.connectivityVM import ConnectivityVM
 from Services.dbhandler import DBhandler
 from Services.database import create_schema
 from Services.api_handler import get_race
+
+
 """
 Global Vars
 """
@@ -30,7 +32,6 @@ backgroundColor = "#1A1A1A"
 @brief This is is the class describing UI components of the main window
         launched on startup
 """
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -56,7 +57,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
 
         # create the main elements and pass down the switch page function
-        self.sidebar = Sidebar(self.switch_page)
+        self.sidebar = Sidebar(self.switch_page, self.conectivityVM)
         # changed the 1st self to try to pass down currentPageIndx
         self.home = HomePage(trackStatusViewModel = self.trackStatusVM, playControlsViewModel = self.playControlsVM, sessionSelectorViewModel= self.sessionSelectorVM, conectivityViewModel= self.conectivityVM)   
         self.settings = GraphCanvasContainer()
@@ -90,7 +91,7 @@ class MainWindow(QMainWindow):
 
 
 class Sidebar(QFrame):
-    def __init__(self, switch_page):
+    def __init__(self, switch_page, connectivityVM):
         super().__init__()
         self.setFixedWidth(125)
         # self.setMaximumWidth(150)
@@ -104,23 +105,33 @@ class Sidebar(QFrame):
             """
         )
 
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.layout = QVBoxLayout(self)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.loginButton = LoginButton(connectivityVM=connectivityVM)
+        self.layout.addWidget(self.loginButton)
         changePageBtn = QPushButton("Home")
         # removes window auto focussing to this button on launch
         changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(0))
-        layout.addWidget(changePageBtn)
+        self.layout.addWidget(changePageBtn)
 
         changePageBtn = QPushButton("Data Analysis")
         changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(1))
-        layout.addWidget(changePageBtn)
+        self.layout.addWidget(changePageBtn)
 
         changePageBtn = QPushButton("Driver Profiles")
         changePageBtn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         changePageBtn.clicked.connect(lambda: switch_page(2))
-        layout.addWidget(changePageBtn)
+        self.layout.addWidget(changePageBtn)
+
+    def removeLoginButton(self):
+        self.layout.removeWidget(self.loginButton)
+        self.loginButton.deleteLater()
+        return 
+        
+
 
     """
     @brief styling function to add a background color to current page
@@ -128,6 +139,25 @@ class Sidebar(QFrame):
 
     def updateHightlight(self):
         print("update button highlight")
+
+class LoginButton(QFrame):
+    def __init__(self, connectivityVM : ConnectivityVM):
+        super().__init__()
+        sectionLayout = QVBoxLayout(self)
+        self.connectivityVM = connectivityVM
+        self.loginStatus: str = "Please login to access all sessions"
+        loginlabel = QLabel(self.loginStatus)
+        loginButton = QPushButton("Login")
+        loginButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        loginButton.clicked.connect(self.openLogin)
+
+        # add to section layout
+        sectionLayout.addWidget(loginlabel)
+        sectionLayout.addWidget(loginButton)
+    
+    def openLogin(self):
+        self.loginPage = LoginPage(connectionStatus= self.connectivityVM)
+        self.loginPage.show()
 
 
 def _main():
