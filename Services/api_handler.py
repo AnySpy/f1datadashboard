@@ -21,7 +21,7 @@ class APIWorkerSignal(QObject):
         return self.__finished
 
 # ? To run, use:
-# ?         worker = GetRaceWorker(self.scraper, soup)
+# ?         worker = GetRaceWorker(year, event_name, type)
 # ?         worker.signal.finished_signal.connect(self.finished_signal.emit)
 # ?         self.thread_pool.start(worker)
 class GetRaceWorker(QRunnable):
