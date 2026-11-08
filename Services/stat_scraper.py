@@ -1,6 +1,7 @@
 from re import compile
 from bs4 import BeautifulSoup, Tag
 from requests_ratelimiter import LimiterSession
+from ViewModels.connectivityVM import ConnectivityVM
 import typing
 
 
@@ -12,6 +13,9 @@ class DriverStatScraper:
             {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         )
 
+        self.connectivityViewModel = ConnectivityVM()
+        self.connectivityViewModel.setup()
+
     def fetch_driver_stats(self, soup: BeautifulSoup) -> dict[str, dict[str, str]]:
         """Gets the stats of the provided driver
 
@@ -22,6 +26,8 @@ class DriverStatScraper:
             dict[str, dict[str, str]]: Two dictionaries: one containing the season stats of the driver and another containing the career stats of the driver.
         """
         driver_stats = {"season": {}, "career": {}}
+        if not self.connectivityViewModel.isOnline:
+            return driver_stats
 
         # ! This feels very fragile and I'd like to find a better way to do this in the future, but for right now it works so :shrug:
         season_container = soup.find("div", class_=compile(r"^order-1"))
@@ -43,6 +49,9 @@ class DriverStatScraper:
         Returns:
             str | None: The URL as a string or `None` if there is no valid URL.
         """
+        if not self.connectivityViewModel.isOnline:
+            return None
+
         # ? This uses the fact that there's only one image that contains `media.formula1.com` on the website to grab the driver's image
         img_tag = soup.find("img", src=compile(r"media\.formula1\.com"))
 
@@ -62,6 +71,9 @@ class DriverStatScraper:
         Returns:
             bytes | None: The bytestream of the image or `None` if there is no valid image found.
         """
+        if not self.connectivityViewModel.isOnline:
+            return None
+        
         img_url = self._fetch_driver_image_url(soup)
         if not img_url:
             return None
@@ -81,7 +93,7 @@ class DriverStatScraper:
         Returns:
             dict[str, str]: A dictionary containing the title of the stat as the key and the value of the stat as the value.
         """
-        if container is None:
+        if container is None or not self.connectivityViewModel.isOnline:
             return {}
 
         data = {}
@@ -113,6 +125,9 @@ class DriverStatScraper:
         Returns:
             str: The biography of the driver as a string.
         """
+        if not self.connectivityViewModel.isOnline:
+            return "Biography Not Available."
+        
         bio_heading = soup.find(
             lambda tag: (
                 tag.name in ["h2", "h3", "h4", "p"]
@@ -146,6 +161,9 @@ class DriverStatScraper:
         Returns:
             BeautifulSoup | None: A BeautifulSoup object containing the request text and is parsed with the html.parser.
         """
+        if not self.connectivityViewModel.isOnline:
+            return None
+
         r = self.session.get(f"https://www.formula1.com/en/drivers/{driver_name}")
 
         if r.status_code != 200:

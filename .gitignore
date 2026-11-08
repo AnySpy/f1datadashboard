@@ -23,3 +23,6 @@ f1_cache/
 
 #database
 *.db
+
+# Potential CSV exports
+*.csv
