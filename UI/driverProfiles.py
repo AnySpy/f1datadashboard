@@ -75,15 +75,21 @@ class ModeHeaderBar(QWidget):
 
     # ? Private signal with property to read from
     __compare_mode_toggled = Signal(bool)
+    __seasonal_mode_toggled = Signal(bool)
 
     @property
     def compare_mode_toggled(self):
         return self.__compare_mode_toggled
 
+    @property
+    def seasonal_mode_toggled(self):
+        return self.__seasonal_mode_toggled
+
     def __init__(self):
         super().__init__()
         # ? Starts in single driver view
         self.is_compare_mode = False
+        self.is_seasonal_mode = False
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -93,44 +99,59 @@ class ModeHeaderBar(QWidget):
             "color: {theme.primaryText}; font-size: 16px; font-weight: bold;"
         )
 
-        # ? I added a space at the beginning of the button text because it looked better to me. It *can* be removed, but I like it this way
-        self.toggle_button = QPushButton(" Compare Drivers")
-        self.toggle_button.setCheckable(True)
-        self.toggle_button.setFixedHeight(32)
-        # TODO: Add a hover effect
-        self.toggle_button.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: #21212e;
-                color: {theme.primaryText};
-                border-radius: 8px;
-                padding: 4px 12px;
-                font-weight: bold;
-            }}
-            QPushButton:checked {{
-                background-color: {theme.info};
-                color: #ffffff;
-            }}
-            """
-        )
-        self.toggle_button.toggled.connect(self._on_toggled)
+        def _button_formatting_factory(button: QPushButton):
+            """Helper function that applies formatting rules for buttons"""
+            button.setCheckable(True)
+            button.setFixedHeight(32)
+            # TODO: Add Hover Effect
+            button.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background-color: #21212e;
+                    color: {theme.primaryText};
+                    border-radius: 8px;
+                    padding: 4px 12px;
+                    font-weight: bold;
+                }}
+                QPushButton:checked {{
+                    background-color: {theme.info};
+                    color: #ffffff;
+                }}
+                """
+            )
+
+        self.seasonal_mode_toggle_button = QPushButton(" Career Mode")
+        _button_formatting_factory(self.seasonal_mode_toggle_button)
+        self.seasonal_mode_toggle_button.toggled.connect(self._on_seasonal_toggled)
+
+        self.compare_toggle_button = QPushButton(" Compare Drivers")
+        _button_formatting_factory(self.compare_toggle_button)
+        self.compare_toggle_button.toggled.connect(self._on_compare_toggled)
 
         # ? Places the "Driver Profile" text in the top left and then puts the button in the top right
         layout.addWidget(title)
         layout.addStretch()
-        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.seasonal_mode_toggle_button)
+        layout.addWidget(self.compare_toggle_button)
 
-    def _on_toggled(self, checked: bool):
+    def _on_compare_toggled(self, checked: bool):
         """Helper function to swap between single view and comparison view
 
         Args:
             checked (bool): _description_
         """
         self.is_compare_mode = checked
-        self.toggle_button.setText(
+        self.compare_toggle_button.setText(
             " Exit Comparison" if checked else " Compare Drivers"
         )
         self.__compare_mode_toggled.emit(checked)
+
+    def _on_seasonal_toggled(self, checked: bool):
+        self.is_seasonal_mode = checked
+        self.seasonal_mode_toggle_button.setText(
+            " Seasonal Mode" if checked else " Career Mode"
+        )
+        self.__seasonal_mode_toggled.emit(checked)
 
 
 # TODO: Possibly change to a search bar later? Depends on how many drivers get loaded in.
@@ -287,14 +308,14 @@ class DriverStatsSection(Card):
         self.main_layout.setContentsMargins(_padding, _padding, _padding, _padding)
         self.main_layout.setSpacing(12)
 
+        # ! Removed for now
+        '''
         placements_title = QLabel("Recent Placements")
         placements_title.setStyleSheet(
             f"color: {theme.secondaryText}; font-weight: bold; font-size: 12px;"
         )
         self.main_layout.addWidget(placements_title)
-
         # TODO: Pull this from Viewmodel later
-        # ! Still having a hard time knowing where to pull this from. I need to sit down and inspect this at some point
         placement_history = [8, 1, 2, 1, 4]
         location_history = ["London", "Paris", "Norway", "Quatar", "Turkey"]
         formatted_cards = self.view_model.get_formatted_placements(
@@ -337,6 +358,7 @@ class DriverStatsSection(Card):
 
         race_widget = QWidget()
         race_widget.setLayout(race_history)
+        
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -345,6 +367,7 @@ class DriverStatsSection(Card):
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         scroll_area.setStyleSheet("background: transparent;")
         self.main_layout.addWidget(scroll_area)
+        '''
 
         self.career_stats_layout = QGridLayout()
         self.career_placeholder = QLabel("Select a driver to view career statistics.")
