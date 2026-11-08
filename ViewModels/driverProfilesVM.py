@@ -183,7 +183,10 @@ class DriverProfilesViewModel(QObject):
         """
         return self._load_driver_stats(soup, "career")
 
-    def select_driver(self, driver_code: str, seasonal: bool):
+    # def select_driver(self, driver_code: str, seasonal: bool)
+    # TODO: Figure out how to pass args to signals
+    # TODO: Fix default image not displaying properly
+    def select_driver(self, driver_code: str):
         """Binds to the signal objects from the driverProfiles to update the display
 
         Args:
@@ -206,10 +209,13 @@ class DriverProfilesViewModel(QObject):
             self.name_changed.emit(_driver_display_name)
             raise ValueError(f"Driver not found: {driver_name}. Showing default values")
 
-        if seasonal:
-            stats = self.get_season_stats(soup)
-        else:
-            stats = self.get_career_stats(soup)
+        # ? Omitted for now until I can fix the seasonal selection
+        # if seasonal:
+        #     stats = self.get_season_stats(soup)
+        # else:
+        #     stats = self.get_career_stats(soup)
+        
+        stats = self.get_career_stats(soup)
         bio_text = self.get_driver_bio(soup)
 
         if not stats:
