@@ -109,6 +109,7 @@ class DriverProfilesViewModel(QObject):
 
         self.scraper = DriverStatScraper()
         self.thread_pool = QThreadPool.globalInstance()
+        self._current_driver_code: str | None = None
 
     # Methods to be used externally
     def get_driver_names(self) -> list[str]:
@@ -183,16 +184,16 @@ class DriverProfilesViewModel(QObject):
         """
         return self._load_driver_stats(soup, "career")
 
-    # def select_driver(self, driver_code: str, seasonal: bool)
-    # TODO: Figure out how to pass args to signals
     # TODO: Fix default image not displaying properly
-    def select_driver(self, driver_code: str):
+    def select_driver(self, driver_code: str, seasonal: bool):
         """Binds to the signal objects from the driverProfiles to update the display
 
         Args:
             driver_code (str): The code of the driver (e.g. Max Verstappen would be `VER`)
             seasonal (bool): Whether to get seasonal or career statistics
         """
+        # ? Helps guard against race conditions
+        self._current_driver_code = driver_code
         driver_dict = self._get_known_drivers()
 
         driver_name = driver_dict[driver_code]
@@ -210,16 +211,15 @@ class DriverProfilesViewModel(QObject):
             raise ValueError(f"Driver not found: {driver_name}. Showing default values")
 
         # ? Omitted for now until I can fix the seasonal selection
-        # if seasonal:
-        #     stats = self.get_season_stats(soup)
-        # else:
-        #     stats = self.get_career_stats(soup)
-        
-        stats = self.get_career_stats(soup)
+        if seasonal:
+            stats = self.get_season_stats(soup)
+        else:
+            stats = self.get_career_stats(soup)
+
         bio_text = self.get_driver_bio(soup)
 
         if not stats:
-            career_stats = {"Status": "No Stats Available"}
+            stats = {"Status": "No Stats Available"}
         if not bio_text:
             bio_text = "Biography Not Available."
 
@@ -228,7 +228,9 @@ class DriverProfilesViewModel(QObject):
         self.name_changed.emit(_driver_display_name)
 
         worker = ImageWorker(self.scraper, soup)
-        worker.signals.finished_signal.connect(self.img_changed.emit)
+        worker.signals.finished_signal.connect(
+            lambda pixmap, code=driver_code: self._on_image_loaded(pixmap, code)
+        )
 
         self.thread_pool.start(worker)
 
@@ -302,8 +304,12 @@ class DriverProfilesViewModel(QObject):
 
         return data[scope]
 
+    def _on_image_loaded(self, pixmap: QPixmap, driver_code: str) -> None:
+        if driver_code == self._current_driver_code:
+            self.img_changed.emit(pixmap)
 
-def _main():
+
+def _main(): 
     vm_test = DriverProfilesViewModel()
     data = vm_test.get_driver_codes()
     print(data)

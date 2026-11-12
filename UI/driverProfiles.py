@@ -493,10 +493,12 @@ class DriverProfiles(QWidget):
 
         self.header_bar.compare_mode_toggled.connect(self._set_compare_mode)
 
-        self.nav_bar.selected_driver_changed.connect(self.view_model.select_driver)
-        self.dropdown_a.currentTextChanged.connect(self.view_model.select_driver)
+        self.dropdown_a.currentTextChanged.connect(self._driver_selector_helper)
         self.nav_bar.selected_driver_changed.connect(self.dropdown_a.setCurrentText)
         self.dropdown_b.currentTextChanged.connect(self.view_model.select_driver_b)
+
+        # ? Helps refresh the UI whenever the seasonal toggle is checked
+        self.header_bar.seasonal_mode_toggled.connect(self._on_seasonal_mode_toggled)
 
         self.view_model.bio_changed.connect(self.driver_about_section.update_bio)
         self.view_model.name_changed.connect(self.driver_about_section.update_name)
@@ -533,3 +535,13 @@ class DriverProfiles(QWidget):
             self.view_model.stats_changed.connect(
                 self.driver_b_stats_section.update_stats
             )
+
+    def _driver_selector_helper(self, driver_code: str) -> None:
+        seasonal = self.header_bar.is_seasonal_mode
+        self.view_model.select_driver(driver_code, seasonal)
+
+    # ? Leaving `checked` in here despite it not being accessed. I can't remember if PySide6 wants the connection here regardless of if it's used or not.
+    def _on_seasonal_mode_toggled(self, checked: bool) -> None:
+        current_driver = self.dropdown_a.currentText()
+        if current_driver:
+            self._driver_selector_helper(current_driver)

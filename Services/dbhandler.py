@@ -1410,43 +1410,6 @@ class DBhandler:
             (code, f"#{c}" if c and not str(c).startswith("#") else c)
             for code, c in rows
         ]
-    
-    def exportDatabase(self, table: str | None):
-        """WIP: Exports the entire database to CSV for more advanced data analysis in Excel, etc.
-        
-        WARN: VERY SLOW! Please do not use right now.
-        """
-        cursor = self.conn.cursor()
-
-        if table is not None:
-            cursor.execute(f"SELECT * FROM '{table}';")
-            data = cursor.fetchall()
-
-            with open(f"./{table}.csv", "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow([header[0] for header in cursor.description])
-                for entry in data:
-                    writer.writerow(entry)
-
-                f.close()
-
-            return
-
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
-        tables = cursor.fetchall()
-
-        for (table,) in tables:
-            cursor.execute(f"SELECT * FROM '{table}';")
-            data = cursor.fetchall()
-
-            # ? Will output them next to main.py
-            with open(f"./{table}.csv", "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow([header[0] for header in cursor.description])
-                for entry in data:
-                    writer.writerow(entry)
-
-                f.close()
 
 def main(): 
     dbHandler = DBhandler()
