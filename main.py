@@ -70,7 +70,10 @@ class MainWindow(QMainWindow):
             playControlsVM=self.playControlsVM,
         )
         self.driverStandingsVM = DriverStandingsViewModel(
-            playControlsVM=self.playControlsVM, signals=self.blockLoaderSignals, focusDriverVM = self.focusDriverVM
+            playControlsVM=self.playControlsVM,
+            signals=self.blockLoaderSignals,
+            focusDriverVM=self.focusDriverVM,
+            sessionSelectorVM=self.sessionSelectorVM,
         )
 
         # when the sessionID changes you need to clear previously stored data

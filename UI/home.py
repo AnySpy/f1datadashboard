@@ -577,10 +577,12 @@ class DriverCard(QPushButton):
     def __init__(
         self,
         driverCode: str,
+        driverFullName: str,
         driverTeam: str,
         timeBehind: float | str | None,
-        position: int = 1,
-    ):
+        position: int,
+        positionDifference: int,
+        ):
         super().__init__()
         self.setMinimumHeight(40)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -609,17 +611,6 @@ class DriverCard(QPushButton):
         layout.setContentsMargins(padding, 6, padding, 6)
         layout.setSpacing(padding)
 
-        positionLabel = QLabel(f"P{position}")
-        positionLabel.setFixedWidth(30)
-        positionLabel.setStyleSheet(
-            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
-        )
-
-        driverLabel = QLabel(driverCode)
-        driverLabel.setStyleSheet(
-            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
-        )
-
         teamLabel = QLabel(driverTeam or "Unknown team")
         teamLabel.setStyleSheet(
             f"background: transparent; color: {theme.secondaryText};"
@@ -631,8 +622,8 @@ class DriverCard(QPushButton):
             f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
         )
 
-        layout.addWidget(positionLabel)
-        layout.addWidget(driverLabel)
+        layout.addLayout(self._positionDataContainer(position, positionDifference))
+        layout.addLayout(self._driverContainer(driverCode, driverFullName))
         layout.addWidget(teamLabel, 1)
         layout.addWidget(gapLabel)
 
@@ -651,6 +642,62 @@ class DriverCard(QPushButton):
         if isinstance(timeBehind, (int, float)):
             return f"+{timeBehind:.3f}s"
         return str(timeBehind)
+
+    @staticmethod
+    def _driverContainer(driverCode: str, driverFullName: str) -> QVBoxLayout:
+        driverLayout = QVBoxLayout()
+        driverLayout.setContentsMargins(0, 0, 0, 0)
+        driverLayout.setSpacing(0)
+
+        driverLabel = QLabel(driverCode)
+        driverLabel.setStyleSheet(
+            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
+        )
+        driverNameLabel = QLabel(driverFullName)
+        driverNameLabel.setStyleSheet(
+            f"background: transparent; color: {theme.secondaryText}; font-size: 10px;"
+        )
+
+        driverLayout.addWidget(driverLabel)
+        driverLayout.addWidget(driverNameLabel)
+        return driverLayout
+
+    @staticmethod
+    def _positionDataContainer(
+        currentPosition: int, positionDifference: int | None
+    ) -> QHBoxLayout:
+        positionLayout = QHBoxLayout()
+        positionLayout.setSpacing(2)
+
+        positionLabel = QLabel(str(currentPosition))
+        positionLabel.setFixedWidth(24)
+        positionLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        positionLabel.setStyleSheet(
+            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
+        )
+
+        if positionDifference is None or positionDifference == 0:
+            differenceText = "-"
+            differenceColor = theme.secondaryText
+            tooltip = "No position change"
+        elif positionDifference > 0:
+            differenceText = f"\u2191{positionDifference}"
+            differenceColor = theme.success
+            tooltip = f"Gained {positionDifference} positions"
+        else:
+            differenceText = f"\u2193{abs(positionDifference)}"
+            differenceColor = theme.danger
+            tooltip = f"Lost {abs(positionDifference)} positions"
+
+        positionDifferenceLabel = QLabel(differenceText)
+        positionDifferenceLabel.setStyleSheet(
+            f"background: transparent; color: {differenceColor}; font-size: 10px;"
+        )
+        positionDifferenceLabel.setToolTip(tooltip)
+
+        positionLayout.addWidget(positionLabel)
+        positionLayout.addWidget(positionDifferenceLabel)
+        return positionLayout
 
 
 class DriverStandings(Card):
@@ -696,11 +743,15 @@ class DriverStandings(Card):
             driverCode = driver.get("driverCode", driver.get("driver_code")) or "???"
             team = driver.get("team") or "Unknown team"
             timeBehind = driver.get("timeBehind", driver.get("time_behind"))
+            driverFullName = driver.get("driverName")
+            positionDifference = driver.get("positionDifference")
             driverCard = DriverCard(
                 driverCode=str(driverCode),
+                driverFullName= str(driverFullName),
                 driverTeam=str(team),
                 timeBehind=timeBehind,
                 position=driver.get("position", position),
+                positionDifference= positionDifference,
             )
             if driverCode in currentFocusDrivers:
                 driverCard.setFocused(True)

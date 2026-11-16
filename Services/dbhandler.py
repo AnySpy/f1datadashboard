@@ -1536,6 +1536,19 @@ class DBhandler:
             for code, c in rows
         ]
 
+    def getDriverName(self, driverCode:str, sessionID: int) -> str:
+        """
+        _simple function that returns the full name of a driver refrenced by the driverCode and sessionID_
+        """
+        name = self.conn.execute(
+            """ 
+            SELECT full_name
+            FROM drivers
+            WHERE driver_code = ? AND session_id = ?
+            """,
+            (driverCode, sessionID),
+        ).fetchone()
+        return name
 
 def main():
     dbHandler = DBhandler()
