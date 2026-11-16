@@ -7,6 +7,7 @@ from Services.dbhandler import DBhandler
 
 if TYPE_CHECKING:
     from ViewModels.raceSimulationVM import PlayControlsVM
+    from ViewModels.sessionSelectorVM import SessionSelectorVM
 
 """
 NOTE:
@@ -244,10 +245,17 @@ class DriverStandingsViewModel(QObject):
         return self.__focused_driver_loaded
 
     # NOTE: I feel like we don't need the DBhandler to be passed down so I am removing it
-    def __init__(self, playControlsVM: PlayControlsVM, focusDriverVM: FocusDriverVM, signals: BlockLoaderWorkerSignals):
+    def __init__(
+        self,
+        playControlsVM: PlayControlsVM,
+        focusDriverVM: FocusDriverVM,
+        signals: BlockLoaderWorkerSignals,
+        sessionSelectorVM: SessionSelectorVM,
+    ):
         super().__init__()
         self.dbhandler = DBhandler()
         self.__driver_data: list = []
+        self.sessionSelectorVM = sessionSelectorVM
 
         self.focusDriverVM = focusDriverVM
         self.dataBlockSignals = signals
@@ -300,19 +308,36 @@ class DriverStandingsViewModel(QObject):
                 row.get("position") if row.get("position") is not None else float("inf"),
             )
         )
-        self.standingsData = [
-            {
-                "position": row.get("position"),
-                "driverCode": row.get("driver"),
-                "team": row.get("team"),
-                "timeBehind": (
-                    row["lap_start_time"] - self.currentLeaderStartLapTime
-                    if row.get("lap_start_time") is not None
-                    else None
-                ),
-            }
-            for row in driversOnLap
-        ]
+        # clear standings data
+        self.standingsData = []
+        
+        for row in driversOnLap:
+            driverCode = row.get("driver")
+            position = row.get("position")
+            nameRow = self.dbhandler.getDriverName(
+                driverCode=driverCode,
+                sessionID=self.sessionSelectorVM.currentSessionID,
+            )
+            driverName = nameRow[0] if nameRow else driverCode
+            positionDifference = (
+                self.calculatePositionDifference(driverCode, position)
+                if position is not None
+                else 0
+            )
+            self.standingsData.append(
+                {
+                    "position": position,
+                    "positionDifference": positionDifference,
+                    "driverCode": driverCode,
+                    "driverName": driverName,
+                    "team": row.get("team"),
+                    "timeBehind": (
+                        row["lap_start_time"] - self.currentLeaderStartLapTime
+                        if row.get("lap_start_time") is not None
+                        else None
+                    ),
+                }
+            )
 
     def searchCurrentLap(self, time: float) -> tuple[int, float, float] | None:
         """_search for current lap of leading driver based on time given_
@@ -363,5 +388,13 @@ class DriverStandingsViewModel(QObject):
     def getFocusDrivers(self) -> set:
         return self.focusDriverVM.focusedDrivers
     
-    # NOTE: Depriciate
-    
+    def calculatePositionDifference(self, driverCode: str, currentPosition: int) -> int:
+        for block in self.__driver_data:
+            for row in block:
+                if row.get("driver") == driverCode and row.get("lap_number") == 1:
+                    startingPosition = row.get("position")
+                    if startingPosition is not None:
+                        return startingPosition - currentPosition
+
+        return 0 
+                

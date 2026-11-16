@@ -1,5 +1,8 @@
 # basic test application
+from pathlib import Path
+
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from UI.Theme import theme, fontStyles
 from ViewModels.raceSimulationVM import PlayControlsVM
 from ViewModels.trackStatusVM import TrackStatusVM
@@ -7,7 +10,6 @@ from ViewModels.simulationGraphVM import SimulationCanvas
 from ViewModels.sessionSelectorVM import SessionSelectorVM
 from ViewModels.connectivityVM import ConnectivityVM
 from ViewModels.driverStandingsVM import (
-    BlockLoaderWorkerSignals,
     DriverStandingsViewModel,
     FocusDriverVM,
 )
@@ -106,26 +108,115 @@ class ComboBoxStyling(QComboBox):
     Args:
         QComboBox (Pyside6 Object): _init. to the super class_
     """
+    dropDownWidth = 24
+
     def __init__(self):
         super().__init__()
         self.setStyle(QStyleFactory.create("Fusion"))
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        chevronPath = Path(__file__).resolve().parent / "images" / "downChevron.png"
         self.setStyleSheet(
             f"""
             QComboBox {{
                 color: {theme.primaryText};
-                border-radius: {borderRadius};
+                border: none;
+                border-bottom: 1px solid {theme.primaryText};
+                border-radius: 0;
                 padding: 2px;
             }}
 
             QComboBox::drop-down {{
-                width: 14px;
-                border: 1px solid {theme.secondaryText};
-
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: {self.dropDownWidth}px;
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
             }}
             """
         )
+        self.chevronLabel = QLabel(self)
+        self.chevronLabel.setPixmap(QPixmap(str(chevronPath)))
+        self.chevronLabel.setScaledContents(True)
+        self.chevronLabel.setFixedSize(18, 18)
+        self.chevronLabel.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        horizontalOffset = (self.dropDownWidth - self.chevronLabel.width()) // 2
+        self.chevronLabel.move(
+            self.width() - self.dropDownWidth + horizontalOffset,
+            (self.height() - self.chevronLabel.height()) // 2,
+        )
 
 # NOTE: fix issue with buffer UI
+class RaceMarkerSlider(QSlider):
+    def __init__(self, orientation):
+        super().__init__(orientation)
+        self.raceStartTime: float | None = None
+        self.raceEndTime: float | None = None
+        self.startLabel, self.startLine = self._createMarker("S", theme.success)
+        self.finishLabel, self.finishLine = self._createMarker("F", theme.danger)
+        self.rangeChanged.connect(self._onRangeChanged)
+
+    def _createMarker(self, labelText: str, color: str) -> tuple[QLabel, QFrame]:
+        label = QLabel(labelText, self)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setFixedSize(12, 12)
+        label.setStyleSheet(
+            f"color: {color}; background: transparent; font-size: 9px; font-weight: bold;"
+        )
+        line = QFrame(self)
+        line.setFixedWidth(2)
+        line.setStyleSheet(f"background-color: {color}; border: none;")
+        for marker in (label, line):
+            marker.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        label.hide()
+        line.hide()
+        return label, line
+
+    def setRaceMarkers(
+        self, raceStartTime: float | None, raceEndTime: float | None
+    ) -> None:
+        self.raceStartTime = raceStartTime
+        self.raceEndTime = raceEndTime
+        self._positionMarkers()
+
+    def _onRangeChanged(self, minimum: int, maximum: int) -> None:
+        self._positionMarkers()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._positionMarkers()
+
+    def _positionMarkers(self) -> None:
+        valueRange = self.maximum() - self.minimum()
+        if valueRange <= 0 or self.width() <= 0:
+            return
+
+        markerWidth = max(0, self.width() - 13)
+        for markerTime, label, line in (
+            (self.raceStartTime, self.startLabel, self.startLine),
+            (self.raceEndTime, self.finishLabel, self.finishLine),
+        ):
+            if markerTime is None:
+                label.hide()
+                line.hide()
+                continue
+
+            markerTime = max(self.minimum(), min(markerTime, self.maximum()))
+            markerX = 6 + round(
+                (markerTime - self.minimum()) / valueRange * markerWidth
+            )
+            labelX = max(0, min(self.width() - label.width(), markerX - 6))
+            lineX = max(0, min(self.width() - line.width(), markerX - 1))
+            label.move(labelX, 0)
+            line.setGeometry(lineX, 12, 2, max(0, self.height() - 12))
+            label.show()
+            line.show()
+
 class PlayControlsUI(Card):
     """_Front-end for the PlayControls VM. this controls the user input for toggling play, scrubbing, and playback speed_
 
@@ -145,21 +236,30 @@ class PlayControlsUI(Card):
         # VMs
         self.playControlsVM = playControlsController
         self.raceDuration: float = 0.00
+        self.driverRaceTime: float = 0.00
         self.availablePlaybackTime: float = 0.00
         self.formattedTime: str = "00:00:00"
         self.SPEEDS: tuple = (1, 2, 4)
         # connect on duration change to the playControlsVM
         self.playControlsVM.updatedRaceDuration.connect(self.onDurationChange)
+        self.playControlsVM.updatedDriverRaceTime.connect(self.onDriverRaceTimeChange)
+        self.playControlsVM.updatedRaceMarkers.connect(self.onRaceMarkersChange)
         self.playControlsVM.updatedTime.connect(self.onCurrentTimeChange)
         # show buffer available
         self.playControlsVM.updatedPlaybackBuffer.connect(self.onBufferUpdated)
         layout = QVBoxLayout(self)
         # scrub bar
         scrubRow = QHBoxLayout()
-        self.currentTimeLabel = QLabel("00:00")
+        self.currentTimeLabel = QLabel("00:00:00")
+        self.currentTimeLabel.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.currentTimeLabel.setFixedWidth(
+            self.currentTimeLabel.fontMetrics().horizontalAdvance("00:00:00")
+        )
         # ? I had to change this to Qt.Orientation.Horizontal to get it to compile for some reason. Apparently it's a newer change with PySide6?
         # create the slider NOTE: might want to make this it's own class later on
-        self.scrubSlider = QSlider(Qt.Orientation.Horizontal)
+        self.scrubSlider = RaceMarkerSlider(Qt.Orientation.Horizontal)
         self.scrubSlider.setMinimumHeight(28)
         self.scrubSlider.setTracking(True)
         self.scrubSlider.setRange(0, 100)  # will be rescaled once duration is known
@@ -195,6 +295,9 @@ class PlayControlsUI(Card):
                 width: 12px;
                 margin: -4px 0;
                 border-radius: 6px;
+            }}
+            QSlider::chunk {{
+                background-color: {theme.primaryText};
             }}
             """
         )
@@ -341,12 +444,19 @@ class PlayControlsUI(Card):
         self.formattedTime = self._formatTime(newDuration)
         self.scrubSlider.setRange(0, int(self.raceDuration))
         self.durationLabel.setText(self.formattedTime)
+    def onDriverRaceTimeChange(self, newDriverRaceTime: float):
+        self.driverRaceTime = max(0.0, newDriverRaceTime)
         self.onBufferUpdated(self.availablePlaybackTime)
+    def onRaceMarkersChange(self, raceStartTime: float, raceEndTime: float):
+        self.scrubSlider.setRaceMarkers(
+            raceStartTime if raceStartTime >= 0 else None,
+            raceEndTime if raceEndTime >= 0 else None,
+        )
         # self.scrubSlider.blockSignals(False)
     def onBufferUpdated(self, newTime: float):
-        self.availablePlaybackTime = max(0.0, min(newTime, self.raceDuration))
-        if self.raceDuration > 0:
-            progress = round(self.availablePlaybackTime / self.raceDuration * 1000)
+        self.availablePlaybackTime = max(0.0, min(newTime, self.driverRaceTime))
+        if self.driverRaceTime > 0:
+            progress = round(self.availablePlaybackTime / self.driverRaceTime * 1000)
             self.bufferProgress.setValue(progress)
         else:
             self.bufferProgress.setValue(0)
@@ -467,10 +577,12 @@ class DriverCard(QPushButton):
     def __init__(
         self,
         driverCode: str,
+        driverFullName: str,
         driverTeam: str,
         timeBehind: float | str | None,
-        position: int = 1,
-    ):
+        position: int,
+        positionDifference: int,
+        ):
         super().__init__()
         self.setMinimumHeight(40)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -499,17 +611,6 @@ class DriverCard(QPushButton):
         layout.setContentsMargins(padding, 6, padding, 6)
         layout.setSpacing(padding)
 
-        positionLabel = QLabel(f"P{position}")
-        positionLabel.setFixedWidth(30)
-        positionLabel.setStyleSheet(
-            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
-        )
-
-        driverLabel = QLabel(driverCode)
-        driverLabel.setStyleSheet(
-            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
-        )
-
         teamLabel = QLabel(driverTeam or "Unknown team")
         teamLabel.setStyleSheet(
             f"background: transparent; color: {theme.secondaryText};"
@@ -521,8 +622,8 @@ class DriverCard(QPushButton):
             f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
         )
 
-        layout.addWidget(positionLabel)
-        layout.addWidget(driverLabel)
+        layout.addLayout(self._positionDataContainer(position, positionDifference))
+        layout.addLayout(self._driverContainer(driverCode, driverFullName))
         layout.addWidget(teamLabel, 1)
         layout.addWidget(gapLabel)
 
@@ -541,6 +642,62 @@ class DriverCard(QPushButton):
         if isinstance(timeBehind, (int, float)):
             return f"+{timeBehind:.3f}s"
         return str(timeBehind)
+
+    @staticmethod
+    def _driverContainer(driverCode: str, driverFullName: str) -> QVBoxLayout:
+        driverLayout = QVBoxLayout()
+        driverLayout.setContentsMargins(0, 0, 0, 0)
+        driverLayout.setSpacing(0)
+
+        driverLabel = QLabel(driverCode)
+        driverLabel.setStyleSheet(
+            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
+        )
+        driverNameLabel = QLabel(driverFullName)
+        driverNameLabel.setStyleSheet(
+            f"background: transparent; color: {theme.secondaryText}; font-size: 10px;"
+        )
+
+        driverLayout.addWidget(driverLabel)
+        driverLayout.addWidget(driverNameLabel)
+        return driverLayout
+
+    @staticmethod
+    def _positionDataContainer(
+        currentPosition: int, positionDifference: int | None
+    ) -> QHBoxLayout:
+        positionLayout = QHBoxLayout()
+        positionLayout.setSpacing(2)
+
+        positionLabel = QLabel(str(currentPosition))
+        positionLabel.setFixedWidth(24)
+        positionLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        positionLabel.setStyleSheet(
+            f"background: transparent; color: {theme.primaryText}; font-weight: bold;"
+        )
+
+        if positionDifference is None or positionDifference == 0:
+            differenceText = "-"
+            differenceColor = theme.secondaryText
+            tooltip = "No position change"
+        elif positionDifference > 0:
+            differenceText = f"\u2191{positionDifference}"
+            differenceColor = theme.success
+            tooltip = f"Gained {positionDifference} positions"
+        else:
+            differenceText = f"\u2193{abs(positionDifference)}"
+            differenceColor = theme.danger
+            tooltip = f"Lost {abs(positionDifference)} positions"
+
+        positionDifferenceLabel = QLabel(differenceText)
+        positionDifferenceLabel.setStyleSheet(
+            f"background: transparent; color: {differenceColor}; font-size: 10px;"
+        )
+        positionDifferenceLabel.setToolTip(tooltip)
+
+        positionLayout.addWidget(positionLabel)
+        positionLayout.addWidget(positionDifferenceLabel)
+        return positionLayout
 
 
 class DriverStandings(Card):
@@ -586,11 +743,15 @@ class DriverStandings(Card):
             driverCode = driver.get("driverCode", driver.get("driver_code")) or "???"
             team = driver.get("team") or "Unknown team"
             timeBehind = driver.get("timeBehind", driver.get("time_behind"))
+            driverFullName = driver.get("driverName")
+            positionDifference = driver.get("positionDifference")
             driverCard = DriverCard(
                 driverCode=str(driverCode),
+                driverFullName= str(driverFullName),
                 driverTeam=str(team),
                 timeBehind=timeBehind,
                 position=driver.get("position", position),
+                positionDifference= positionDifference,
             )
             if driverCode in currentFocusDrivers:
                 driverCard.setFocused(True)
@@ -911,6 +1072,7 @@ class SessionSelector(Card):
         layout.addWidget(self.yearSelector)
         layout.addWidget(self.eventSelector)
         # layout.addWidget(self.sessionSelector)
+        layout.addStretch(1)
         layout.addWidget(self.connectionLabel)
 
         # self.yearSelector.currentIndexChanged.connect(self.onYearChanged)

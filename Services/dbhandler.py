@@ -999,32 +999,6 @@ class DBhandler:
         # fetchone() returns a tuple like (1,) -- return the number inside it
         return sessionID[0]
 
-    def _calculateTotalSessionTime(self, session: Session) -> float:
-        """
-        Args:
-            session_id (int): _session id of race to calculate total time_
-
-        Returns:
-            float: _returns the total race duration_
-        """
-
-        """Time | pd.Timedelta | The drivers total race time 
-        (values only given if session is ‘Race’, ‘Sprint’, ‘Sprint Shootout’ or 
-        ‘Sprint Qualifying’ >and the driver was not more than one lap behind 
-        the leader"""
-        # can I just pass the memory location so I don't have to load it again
-        # this makes a new DF
-        newSessionStatus = session.session_status
-        startFlag = newSessionStatus.loc[
-            newSessionStatus["Status"] == "Started", "Time"
-        ].iloc[0]
-        endFlag = newSessionStatus.loc[
-            newSessionStatus["Status"] == "Finished", "Time"
-        ].iloc[-1]
-        raceDuration = (endFlag - startFlag).total_seconds()
-        print(f"{session.name} total session time = {raceDuration}")
-        return raceDuration
-
     # NOTE: Flagged for Depreciation
     def _setSessionTotalTime(self):
         """
@@ -1061,6 +1035,33 @@ class DBhandler:
         # convert DF to float | just take the first value from the tuple
         sessionTime: float = sessionDF[0]
         return sessionTime
+
+    def getDriverRaceTime(self, session_id: int) -> float | None:
+        row = self.conn.execute(
+            """
+            SELECT MAX(session_time)
+            FROM live_driver_telemetry
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+        return None if row is None or row[0] is None else float(row[0])
+
+    def getRaceMarkerTimes(
+        self, session_id: int
+    ) -> tuple[float | None, float | None]:
+        row = self.conn.execute(
+            """
+            SELECT MIN(CASE WHEN lap_number = 1 THEN lap_start_time END),
+                   MAX(lap_end_time)
+            FROM laps
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return None, None
+        return row[0], row[1]
 
     def getDataFromTable(
         self,
@@ -1167,7 +1168,7 @@ class DBhandler:
         Returns:
             _type_: _description_
         """
-        print(f"getLapsDataBlock: trying to grab data from laps from laps {lastLoadedLap} to laps{lastLoadedLap + blockSize} ")
+        # print(f"getLapsDataBlock: trying to grab data from laps from laps {lastLoadedLap} to laps{lastLoadedLap + blockSize} ")
         endFlag: bool = False
         currentLoadedLap: int = lastLoadedLap
         selectList = list(attributeList)
@@ -1221,7 +1222,7 @@ class DBhandler:
         Returns:
             _type_: _description_
         """
-        print(f"getTelemetryDataBlock: trying to get data from live_driver_telemetry from time {lastLoadedTime} to {lastLoadedTime + blockSize}")
+        # print(f"getTelemetryDataBlock: trying to get data from live_driver_telemetry from time {lastLoadedTime} to {lastLoadedTime + blockSize}")
         endFlag = False
         currentLoadedTime = lastLoadedTime
 
@@ -1536,7 +1537,21 @@ class DBhandler:
             for code, c in rows
         ]
 
-def main(): 
+    def getDriverName(self, driverCode:str, sessionID: int) -> str:
+        """
+        _simple function that returns the full name of a driver refrenced by the driverCode and sessionID_
+        """
+        name = self.conn.execute(
+            """ 
+            SELECT full_name
+            FROM drivers
+            WHERE driver_code = ? AND session_id = ?
+            """,
+            (driverCode, sessionID),
+        ).fetchone()
+        return name
+
+def main():
     dbHandler = DBhandler()
     dbHandler.loadSessionIntoDB(fastf1.get_session(2026, "Japanese Grand Prix", "R"))
     dbHandler.getSessionsFromDB()
