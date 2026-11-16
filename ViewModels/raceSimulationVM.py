@@ -31,6 +31,8 @@ class PlayControlsVM(QObject):
 
     updatedTime = Signal(float)
     updatedRaceDuration = Signal(float)
+    updatedDriverRaceTime = Signal(float)
+    updatedRaceMarkers = Signal(float, float)
     updatedPlaybackBuffer = Signal(float)
     # this should probably be a property of play controls it will need to listen to changes
     updatedPlayingStatus = Signal(bool)
@@ -128,6 +130,13 @@ class PlayControlsVM(QObject):
         NOTE:
             in future make this handle getting data via getDataFromTable
         """
+        driverRaceTime = self.dbhandler.getDriverRaceTime(newSessionID)
+        self.updatedDriverRaceTime.emit(driverRaceTime or 0.0)
+        raceStart, raceEnd = self.dbhandler.getRaceMarkerTimes(newSessionID)
+        self.updatedRaceMarkers.emit(
+            float(raceStart) if raceStart is not None else -1.0,
+            float(raceEnd) if raceEnd is not None else -1.0,
+        )
         totalDuration = self.dbhandler.getSessionTime(newSessionID)
 
         # might need to handle if the value is None
