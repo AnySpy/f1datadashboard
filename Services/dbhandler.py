@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import csv
 
 import fastf1
 import pandas as pd
@@ -267,11 +268,11 @@ class DBhandler:
             )
         ]
         for table in tables:
-            existing = {r[1] for r in cur.execute(f"PRAGMA table_info({table})")}
+            existing = {r[1].casefold() for r in cur.execute(f"PRAGMA table_info({table})")}
             for _, name, colType, notNull, default, _ in reference.execute(
                 f"PRAGMA table_info({table})"
             ):
-                if name in existing:
+                if name.casefold() in existing:
                     continue
                 definition = f"{name} {colType}".strip()
                 if default is not None:
