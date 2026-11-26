@@ -2,13 +2,13 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Signal, QByteArray, Qt, QRunnable, QThreadPool
 from Services.stat_scraper import DriverStatScraper
 from Services.dbhandler import DBhandler
-from PySide6.QtGui import QPixmap, QPainter, QPainterPath
+from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QImage
 from bs4 import BeautifulSoup
 
 
 class ImageWorkerSignals(QObject):
     # ? Private access variable, the double underscore should prevent use outside of the class unless through the property.
-    __finished = Signal(QPixmap)
+    __finished = Signal(str, str, QImage)
 
     @property
     def finished_signal(self):
@@ -19,29 +19,31 @@ class ImageWorker(QRunnable):
     """Worker object to edit image on a second thread"""
 
     def __init__(
-        self, scraper: DriverStatScraper, soup: BeautifulSoup, size: int = 100
+        self, scraper: DriverStatScraper, soup: BeautifulSoup, signals: ImageWorkerSignals, target: str, driver_code: str, size: int = 100
     ):
         super().__init__()
         self.scraper = scraper
         self.soup = soup
+        self.signals = signals
+        self.target = target
+        self.driver_code = driver_code
         self.size = size
-        self.signals = ImageWorkerSignals()
 
     def run(self):
         """This is the code that is run when the worker object is given the start method"""
         image_bytes = self.scraper.fetch_driver_image(self.soup)
 
-        pixmap = QPixmap()
-        if not (image_bytes and pixmap.loadFromData(QByteArray(image_bytes))):
-            pixmap = QPixmap("images/Driver_Not_found.jpg")
+        image = QImage()
+        if not (image_bytes and image.loadFromData(QByteArray(image_bytes))):
+            image = QImage("images/Driver_Not_found.jpg")
 
-        scaled = pixmap.scaled(
+        scaled = image.scaled(
             self.size,
             self.size,
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
-        canvas = QPixmap(self.size, self.size)
+        canvas = QImage(self.size, self.size, QImage.Format.Format_ARGB32_Premultiplied)
         canvas.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(canvas)
@@ -51,10 +53,10 @@ class ImageWorker(QRunnable):
         path.addEllipse(0, 0, self.size, self.size)
 
         painter.setClipPath(path)
-        painter.drawPixmap(0, 0, scaled)
+        painter.drawImage(0, 0, scaled)
         painter.end()
 
-        self.signals.finished_signal.emit(canvas)
+        self.signals.finished_signal.emit(self.target, self.driver_code, canvas)
 
 
 class DriverProfilesViewModel(QObject):
@@ -110,6 +112,10 @@ class DriverProfilesViewModel(QObject):
         self.scraper = DriverStatScraper()
         self.thread_pool = QThreadPool.globalInstance()
         self._current_driver_code: str | None = None
+        self._current_driver_b_code: str | None = None
+
+        self._image_signals = ImageWorkerSignals()
+        self._image_signals.finished_signal.connect(self._on_image_loaded)
 
     # Methods to be used externally
     def get_driver_names(self) -> list[str]:
@@ -195,6 +201,8 @@ class DriverProfilesViewModel(QObject):
         # ? Helps guard against race conditions
         self._current_driver_code = driver_code
         driver_dict = self._get_known_drivers()
+        if driver_code not in driver_dict:
+            return
 
         driver_name = driver_dict[driver_code]
         # ? We store a copy of the driver name to display before replacing it for URL purposes
@@ -210,7 +218,6 @@ class DriverProfilesViewModel(QObject):
             self.name_changed.emit(_driver_display_name)
             raise ValueError(f"Driver not found: {driver_name}. Showing default values")
 
-        # ? Omitted for now until I can fix the seasonal selection
         if seasonal:
             stats = self.get_season_stats(soup)
         else:
@@ -227,11 +234,7 @@ class DriverProfilesViewModel(QObject):
         self.bio_changed.emit(bio_text)
         self.name_changed.emit(_driver_display_name)
 
-        worker = ImageWorker(self.scraper, soup)
-        worker.signals.finished_signal.connect(
-            lambda pixmap, code=driver_code: self._on_image_loaded(pixmap, code)
-        )
-
+        worker = ImageWorker(self.scraper, soup, self._image_signals, "a", driver_code)
         self.thread_pool.start(worker)
 
     def select_driver_b(self, driver_code: str):
@@ -243,6 +246,9 @@ class DriverProfilesViewModel(QObject):
 
         # ? Almost a carbon copy of select_driver (copy+paste was my friend), but binding to different signals.
         driver_dict = self._get_known_drivers()
+        if driver_code not in driver_dict:
+            return
+        self._current_driver_b_code = driver_code
 
         _driver_display_name = driver_dict[driver_code]
         driver_name = _driver_display_name.lower().replace(" ", "-")
@@ -261,8 +267,7 @@ class DriverProfilesViewModel(QObject):
         self.stats_b_changed.emit(career_stats)
         self.name_b_changed.emit(_driver_display_name)
 
-        worker = ImageWorker(self.scraper, soup, size=60)
-        worker.signals.finished_signal.connect(self.img_b_changed.emit)
+        worker = ImageWorker(self.scraper, soup, self._image_signals, "b", driver_code, size=60)
         self.thread_pool.start(worker)
 
     # Helper Methods
@@ -304,9 +309,12 @@ class DriverProfilesViewModel(QObject):
 
         return data[scope]
 
-    def _on_image_loaded(self, pixmap: QPixmap, driver_code: str) -> None:
-        if driver_code == self._current_driver_code:
+    def _on_image_loaded(self, target: str, driver_code: str, image: QImage) -> None:
+        pixmap = QPixmap.fromImage(image)
+        if target == "a" and driver_code == self._current_driver_code:
             self.img_changed.emit(pixmap)
+        elif target == "b" and driver_code == self._current_driver_b_code:
+            self.img_b_changed.emit(pixmap)
 
 
 def _main(): 
