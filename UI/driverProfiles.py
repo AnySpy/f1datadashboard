@@ -538,10 +538,12 @@ class DriverProfiles(QWidget):
 
     def _driver_selector_helper(self, driver_code: str) -> None:
         seasonal = self.header_bar.is_seasonal_mode
+        print(f"Seasonal mode: {seasonal}")
         self.view_model.select_driver(driver_code, seasonal)
 
     # ? Leaving `checked` in here despite it not being accessed. I can't remember if PySide6 wants the connection here regardless of if it's used or not.
     def _on_seasonal_mode_toggled(self, checked: bool) -> None:
         current_driver = self.dropdown_a.currentText()
+        print(f"Accessing driver {current_driver}")
         if current_driver:
             self._driver_selector_helper(current_driver)

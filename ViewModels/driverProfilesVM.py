@@ -210,7 +210,6 @@ class DriverProfilesViewModel(QObject):
             self.name_changed.emit(_driver_display_name)
             raise ValueError(f"Driver not found: {driver_name}. Showing default values")
 
-        # ? Omitted for now until I can fix the seasonal selection
         if seasonal:
             stats = self.get_season_stats(soup)
         else:
