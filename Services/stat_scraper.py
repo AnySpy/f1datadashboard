@@ -143,7 +143,9 @@ class DriverStatScraper:
         while container and not container.find_all("p"):
             container = container.parent
 
-        assert container is not None
+        if container is None:
+            return "Biography Not Available."
+        
         paragraphs = container.find_all("p")
 
         bio_text = "\n\n".join(

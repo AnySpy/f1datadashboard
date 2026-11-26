@@ -45,6 +45,11 @@ class SearchableDriverDropdown(QComboBox):
         self.setEditable(True)
         self.addItems(driver_codes)
 
+        self.setCurrentIndex(-1)
+        line_edit = self.lineEdit()
+        if line_edit:
+            line_edit.setPlaceholderText("Select Driver")
+
         # ? Autocompleter implementation
         completer = self.completer()
         if completer:
