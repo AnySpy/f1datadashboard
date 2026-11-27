@@ -237,7 +237,7 @@ class DriverProfilesViewModel(QObject):
         worker = ImageWorker(self.scraper, soup, self._image_signals, "a", driver_code)
         self.thread_pool.start(worker)
 
-    def select_driver_b(self, driver_code: str):
+    def select_driver_b(self, driver_code: str, seasonal: bool):
         """Binds to the signal objects from the driverProfiles to update the display
 
         Args:
@@ -260,11 +260,15 @@ class DriverProfilesViewModel(QObject):
             self.name_b_changed.emit(_driver_display_name)
             raise ValueError(f"Driver not found: {driver_name}. Showing default values")
 
-        career_stats = self.get_career_stats(soup)
-        if not career_stats:
-            career_stats = {"Status": "No Stats Available"}
+        if seasonal:
+            stats = self.get_season_stats(soup)
+        else:
+            stats = self.get_career_stats(soup)
+        
+        if not stats:
+            stats = {"Status": "No Stats Available"}
 
-        self.stats_b_changed.emit(career_stats)
+        self.stats_b_changed.emit(stats)
         self.name_b_changed.emit(_driver_display_name)
 
         worker = ImageWorker(self.scraper, soup, self._image_signals, "b", driver_code, size=60)
